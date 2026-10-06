@@ -22,7 +22,7 @@ Tagesansicht), voll responsiv fürs Handy. Farbschema **Schwarz/Orange**.
 
 Die App ist als statische Seite live:
 
-**https://martinwoeckinger-spec.github.io/essen/**
+**https://martinwoeckinger.github.io/essen/**
 
 Veröffentlicht wird über **Settings → Pages → „Deploy from a branch"**
 (Standard-Branch, Ordner `/ (root)`). Da `index.html` im Repo-Root liegt,
