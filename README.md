@@ -35,8 +35,8 @@ Workflow nötig.
 ## Streamlit-Variante (experimentell)
 
 Als Versuch gibt es zusätzlich eine **Python/Streamlit-Portierung** unter
-[`streamlit/`](streamlit/) – gleiche Berechnungen und derselbe Import, aber als
-Server-App. Start: `cd streamlit && pip install -r requirements.txt &&
+[`streamlit/`](streamlit/) – derselbe Import, aber als Server-App (rechnet das
+Tagesbudget noch aus Körperdaten, statt die manuellen Werte zu nutzen). Start: `cd streamlit && pip install -r requirements.txt &&
 streamlit run streamlit_app.py`. Details in [`streamlit/README.md`](streamlit/README.md).
 Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
 
@@ -58,9 +58,11 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
   Zucker/Salz) mit 7-Tage-Schnitt, **Kalender-Heatmap**, **Prognose**
   (geschätzte kg-Veränderung aus der Kalorienbilanz), Verteilung nach Mahlzeit
   und Tracking-Treue (Budget-Treue, Serie).
-- **Profil & Wünsche** – Körperdaten, Wunschgewicht inkl. Tempo-/Dauerschätzung,
-  Ernährungsstil, Makro-Verteilung, Nährwert-Ziele/-Limits und persönliche
-  Hinweise.
+- **Kalorienziel manuell** – zwei feste Tageswerte im Profil eintragen
+  (**Trainingstag** / **kein Trainingstag**), nichts wird berechnet. Pro Tag
+  wird auf „Heute" bzw. im Dashboard markiert, ob es ein Trainingstag ist.
+- **Profil & Wünsche** – Körperdaten, Wunschgewicht, Ernährungsstil,
+  Makro-Verteilung, Nährwert-Ziele/-Limits und persönliche Hinweise.
 - **Backup** – komplette Daten als JSON sichern und wiederherstellen.
 - **Drucken** – aktuellen Tag als sauberen (hellen) Ausdruck/PDF.
 
