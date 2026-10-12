@@ -61,8 +61,10 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
 - **Kalorienziel manuell** – zwei feste Tageswerte im Profil eintragen
   (**Trainingstag** / **kein Trainingstag**), nichts wird berechnet. Pro Tag
   wird auf „Heute" bzw. im Dashboard markiert, ob es ein Trainingstag ist.
-- **Profil & Wünsche** – Körperdaten, Wunschgewicht, Ernährungsstil,
-  Makro-Verteilung, Nährwert-Ziele/-Limits und persönliche Hinweise.
+- **Makro-Ziele manuell** – Eiweiß, Kohlenhydrate und Fett in Gramm direkt
+  eintragen, ebenfalls getrennt für Trainingstag / kein Trainingstag.
+- **Profil & Wünsche** – Körperdaten, Wunschgewicht, Nährwert-Ziele/-Limits
+  und persönliche Hinweise.
 - **Backup** – komplette Daten als JSON sichern und wiederherstellen.
 - **Drucken** – aktuellen Tag als sauberen (hellen) Ausdruck/PDF.
 
