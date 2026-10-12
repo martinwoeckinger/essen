@@ -318,16 +318,10 @@ const MEAL_ORDER=Object.keys(MEALS).sort((a,b)=>MEALS[a].order-MEALS[b].order);
 const defaultMeal=()=>{const h=new Date().getHours();return h<11?'breakfast':h<15?'lunch':h<18?'snack':'dinner';};
 
 /* ---------- Berechnung ---------- */
-const ACTIVITY = {
-  sedentary:{f:1.2,label:'Sitzend – kaum Bewegung'},
-  light:{f:1.375,label:'Leicht aktiv – Bürojob'},
-  moderate:{f:1.55,label:'Mäßig aktiv – viel unterwegs'},
-  active:{f:1.725,label:'Sehr aktiv – körperliche Arbeit'},
-  very_active:{f:1.9,label:'Extrem aktiv'},
-};
-const bmr = p => Math.round(10*p.weight + 6.25*p.height - 5*p.age + (p.sex==='male'?5:-161));
-const maintenance = p => Math.round(bmr(p)*ACTIVITY[p.activity].f);
-const dailyBudget = (p,g,ex) => Math.round(maintenance(p)+g.adjustment+(g.addExercise?ex:0));
+/* Tagesbudget: fester, manuell eingetragener Wert – je nachdem, ob der Tag als Trainingstag markiert ist. */
+const isTrainingDay = day => !!(day&&day.training);
+const dailyBudget = (g,day) => Math.round(+(isTrainingDay(day)?g.kcalTraining:g.kcalRest)||0);
+const dayTypeLabel = day => isTrainingDay(day)?'Trainingstag':'Kein Trainingstag';
 const targetMacros = (cal,g) => ({
   protein:Math.round(cal*g.proteinPct/100/4),
   carbs:Math.round(cal*g.carbsPct/100/4),
@@ -343,14 +337,6 @@ const mealTotals = fs => { const o={}; MEAL_ORDER.forEach(m=>o[m]=sumNut(fs.filt
 const DIET_MACROS={omnivore:{proteinPct:30,carbsPct:40,fatPct:30},vegetarian:{proteinPct:25,carbsPct:45,fatPct:30},vegan:{proteinPct:22,carbsPct:50,fatPct:28},pescetarian:{proteinPct:30,carbsPct:40,fatPct:30},lowcarb:{proteinPct:35,carbsPct:20,fatPct:45},highprotein:{proteinPct:40,carbsPct:35,fatPct:25},keto:{proteinPct:25,carbsPct:5,fatPct:70},mediterranean:{proteinPct:25,carbsPct:45,fatPct:30}};
 const DIET_LABELS={omnivore:'Ausgewogen / Allesesser',vegetarian:'Vegetarisch',vegan:'Vegan',pescetarian:'Pescetarisch (mit Fisch)',lowcarb:'Low Carb',highprotein:'High Protein',keto:'Ketogen',mediterranean:'Mediterran'};
 const KCAL_PER_KG=7700;
-const weeklyChange = adj => Math.round((adj*7/KCAL_PER_KG)*10)/10;
-function weeksToTarget(p,g){
-  if(!p.targetWeight||+p.targetWeight===+p.weight)return null;
-  const pw=weeklyChange(g.adjustment); if(pw===0)return null;
-  const delta=(+p.targetWeight)-(+p.weight);
-  if(Math.sign(delta)!==Math.sign(pw))return null;
-  return Math.ceil(Math.abs(delta)/Math.abs(pw));
-}
 
 /* ---------- Datum ---------- */
 const pad2 = s => String(s).padStart(2,'0');
@@ -424,15 +410,15 @@ const IMPORT_EXAMPLE=[
 
 /* ---------- Persistenz ---------- */
 const DEFAULTS = {
-  profile:{name:'',sex:'male',age:30,height:180,weight:80,targetWeight:null,activity:'light'},
-  goal:{adjustment:0,proteinPct:30,carbsPct:40,fatPct:30,addExercise:true,dietStyle:'omnivore',fiberGoal:30,sugarLimit:50,saltLimit:6,satFatLimit:20,preferences:''},
+  profile:{name:'',sex:'male',age:30,height:180,weight:80,targetWeight:null},
+  goal:{kcalTraining:2500,kcalRest:2000,proteinPct:30,carbsPct:40,fatPct:30,dietStyle:'omnivore',fiberGoal:30,sugarLimit:50,saltLimit:6,satFatLimit:20,preferences:''},
   days:{},favorites:[],ui:{theme:'light',collapsedMeals:{}},
 };
 function migrateDays(days){
   const out={};
   Object.keys(days||{}).forEach(k=>{
     const d=days[k]||{};
-    out[k]={date:d.date||k,exercises:d.exercises||[],foods:(d.foods||[]).map(f=>Object.assign({meal:'snack',sugar:0,saturatedFat:0,fiber:0,salt:0,source:'manual'},f))};
+    out[k]={date:d.date||k,training:!!d.training,exercises:d.exercises||[],foods:(d.foods||[]).map(f=>Object.assign({meal:'snack',sugar:0,saturatedFat:0,fiber:0,salt:0,source:'manual'},f))};
   });
   return out;
 }
@@ -455,6 +441,16 @@ function addFoodTo(setState,date,food){
 }
 function updateFood(setState,date,id,patch){
   setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,foods:d.foods.map(f=>f.id===id?{...f,...patch}:f)}}};});
+}
+function setTrainingDay(setState,date,training){
+  setState(s=>{const d=s.days[date]||{date,foods:[],exercises:[]};return{...s,days:{...s.days,[date]:{...d,training:!!training}}};});
+}
+function DayTypeSeg({state,setState,date}){
+  const training=isTrainingDay(state.days[date]);
+  return (<div className="seg full" role="group" aria-label="Tagestyp">
+    <button className={training?'on':''} onClick={()=>setTrainingDay(setState,date,true)}><Icon name="fitness_center"/> Trainingstag</button>
+    <button className={!training?'on':''} onClick={()=>setTrainingDay(setState,date,false)}>Kein Trainingstag</button>
+  </div>);
 }
 function addExTo(setState,date,ex){
   setState(s=>{const d=s.days[date]||{date,foods:[],exercises:[]};return{...s,days:{...s.days,[date]:{...d,exercises:[...d.exercises,{...ex,id:uid(),time:new Date().toISOString()}]}}};});
@@ -544,12 +540,12 @@ const DayBars=({data,unit='',color='var(--data)',refLabel='Budget'})=>{
     </div>
   </div>);
 };
-function Heatmap({days,profile,goal,onPick,weeks=9}){
+function Heatmap({days,goal,onPick,weeks=9}){
   const today=todayKey();
   const startMon=getMonday(addDays(today,-7*(weeks-1)));
   const wd=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const grid=[]; for(let w=0;w<weeks;w++){const row=[];for(let d=0;d<7;d++)row.push(addDays(startMon,w*7+d));grid.push(row);}
-  const color=k=>{const day=days[k];if(!day||!day.foods.length)return 'var(--card2)';const burned=Math.round(day.exercises.reduce((a,e)=>a+(+e.calories||0),0));const budget=dailyBudget(profile,goal,burned);return sumCal(day.foods)<=budget?'var(--good)':'var(--danger)';};
+  const color=k=>{const day=days[k];if(!day||!day.foods.length)return 'var(--card2)';const budget=dailyBudget(goal,day);return sumCal(day.foods)<=budget?'var(--good)':'var(--danger)';};
   return (<div style={{maxWidth:300}}>
     <div className="heat-week" style={{marginBottom:4}}>{wd.map(x=><div key={x} className="muted small" style={{flex:1,textAlign:'center'}}>{x}</div>)}</div>
     <div className="heatmap">{grid.map((row,wi)=>(<div className="heat-week" key={wi}>{row.map(k=>{const fut=k>today;return <button key={k} className="heat-cell" disabled={fut||!(days[k]&&days[k].foods.length)} title={k+(days[k]&&days[k].foods.length?(' · '+sumCal(days[k].foods)+' kcal'):' · –')} style={{background:fut?'transparent':color(k),visibility:fut?'hidden':'visible'}} onClick={()=>onPick(k)}/>;})}</div>))}</div>
@@ -571,14 +567,13 @@ function buildDaySummary(state,date){
   const day=state.days[date]||{date,foods:[],exercises:[]};
   const t=sumNut(day.foods);
   const burned=Math.round(day.exercises.reduce((a,e)=>a+(+e.calories||0),0));
-  const budget=dailyBudget(profile,goal,burned);
+  const budget=dailyBudget(goal,day);
   const tgt=targetMacros(budget,goal);
   const rest=budget-t.calories;
-  const modeLabel=goal.adjustment<0?'Abnehmen':goal.adjustment>0?'Aufbauen':'Halten';
   const L=[];
   L.push('Ernährungs-Tagesübersicht – '+fullDate(date));
   L.push('');
-  L.push('Ziel: '+modeLabel+' · Tagesbudget '+budget+' kcal (Erhaltung '+maintenance(profile)+(goal.adjustment?', Anpassung '+(goal.adjustment>0?'+':'')+goal.adjustment:'')+') · Stil: '+DIET_LABELS[goal.dietStyle]);
+  L.push('Ziel: Tagesbudget '+budget+' kcal ('+dayTypeLabel(day)+') · Stil: '+DIET_LABELS[goal.dietStyle]);
   L.push('Profil: '+(profile.sex==='male'?'m':'w')+', '+profile.age+' J, '+profile.height+' cm, '+profile.weight+' kg'+(profile.targetWeight?' (Ziel '+profile.targetWeight+' kg)':''));
   if((goal.preferences||'').trim()) L.push('Vorlieben/Hinweise: '+goal.preferences.trim());
   L.push('');
@@ -770,7 +765,7 @@ function Dashboard({state,setState,date,setDate,openImport}){
   const day=state.days[date]||{date,foods:[],exercises:[]};
   const totals=sumNut(day.foods), consumed=totals.calories;
   const burned=Math.round(day.exercises.reduce((a,e)=>a+(+e.calories||0),0));
-  const budget=dailyBudget(profile,goal,burned), target=targetMacros(budget,goal);
+  const budget=dailyBudget(goal,day), target=targetMacros(budget,goal);
   const [pick,setPick]=useState(false),[share,setShare]=useState(false);
   const macroSegs=[{value:totals.protein*4,color:'var(--protein)'},{value:totals.carbs*4,color:'var(--carbs)'},{value:totals.fat*9,color:'var(--fat)'}];
   return (
@@ -793,7 +788,7 @@ function Dashboard({state,setState,date,setDate,openImport}){
         <div className="hero-stats">
           <Stat label="Budget" value={budget} sub="kcal"/>
           <Stat label="Gegessen" value={consumed} sub="kcal"/>
-          <Stat label="Sport" value={'+'+burned} sub="kcal"/>
+          <Stat label="Sport" value={burned} sub="kcal verbrannt"/>
         </div>
       </section>
       <section className="card">
@@ -817,11 +812,13 @@ function Dashboard({state,setState,date,setDate,openImport}){
         <MacroBar label="Salz" value={totals.salt} target={goal.saltLimit} color="var(--salt)" limit/>
       </section>
       <section className="card">
-        <div className="energy-row"><span>Grundumsatz</span><strong>{bmr(profile)} kcal</strong></div>
-        <div className="energy-row"><span>+ Alltag (Erhaltung)</span><strong>{maintenance(profile)} kcal</strong></div>
-        <div className="energy-row"><span>+ Sportumsatz heute</span><strong>{burned} kcal</strong></div>
-        <div className="energy-row"><span>± Ziel-Anpassung</span><strong>{goal.adjustment>0?'+':''}{goal.adjustment} kcal</strong></div>
-        <div className="energy-row total"><span>= Tagesbudget</span><strong>{budget} kcal</strong></div>
+        <h3 className="card-title">Tagestyp</h3>
+        <DayTypeSeg state={state} setState={setState} date={date}/>
+        <div className="energy-row" style={{marginTop:10}}><span>Trainingstag</span><strong>{Math.round(+goal.kcalTraining||0)} kcal</strong></div>
+        <div className="energy-row"><span>Kein Trainingstag</span><strong>{Math.round(+goal.kcalRest||0)} kcal</strong></div>
+        <div className="energy-row"><span>Sport heute (nur Info)</span><strong>{burned} kcal</strong></div>
+        <div className="energy-row total"><span>= Tagesbudget ({dayTypeLabel(day)})</span><strong>{budget} kcal</strong></div>
+        <p className="muted small" style={{margin:'8px 0 0'}}>Die Werte trägst du im Profil manuell ein – es wird nichts berechnet.</p>
       </section>
       </div>
       </div>
@@ -852,6 +849,8 @@ function Today({state,setState,date,setDate,openImport,notify}){
         <button className="chip" onClick={()=>setShare(true)}><Icon name="smart_toy"/> Für Claude</button>
         <button className="chip" onClick={()=>window.print()}><Icon name="print"/> Drucken</button>
       </div>
+
+      <DayTypeSeg state={state} setState={setState} date={date}/>
 
       <button className="erfassen-btn" onClick={openImport}><Icon name="add"/> Mahlzeit erfassen</button>
 
@@ -916,9 +915,9 @@ function Stats({state,setDate,goToToday}){
   const today=todayKey();
   const rows=useMemo(()=>{
     const keys=[]; for(let i=range-1;i>=0;i--)keys.push(addDays(today,-i));
-    return keys.map(k=>{const d=days[k]||{foods:[],exercises:[]};const burned=Math.round(d.exercises.reduce((a,e)=>a+(+e.calories||0),0));
-      return {key:k,budget:dailyBudget(profile,goal,burned),totals:sumNut(d.foods),target:targetMacros(dailyBudget(profile,goal,burned),goal),meals:mealTotals(d.foods),has:d.foods.length>0};});
-  },[days,profile,goal,range,today]);
+    return keys.map(k=>{const d=days[k]||{foods:[],exercises:[]};const budget=dailyBudget(goal,d);
+      return {key:k,budget,totals:sumNut(d.foods),target:targetMacros(budget,goal),meals:mealTotals(d.foods),has:d.foods.length>0};});
+  },[days,goal,range,today]);
   const tracked=rows.filter(r=>r.has);
 
   const chartData=rows.map(r=>{
@@ -1002,7 +1001,7 @@ function Stats({state,setDate,goToToday}){
 
       <section className="card">
         <h3 className="card-title"><Icon name="calendar_month"/> Kalender</h3>
-        <Heatmap days={days} profile={profile} goal={goal} onPick={k=>{setDate(k);goToToday();}}/>
+        <Heatmap days={days} goal={goal} onPick={k=>{setDate(k);goToToday();}}/>
       </section>
 
       <div className="grid2">
@@ -1035,13 +1034,13 @@ function Stats({state,setDate,goToToday}){
 
 /* ---------- Archiv (im Profil eingebettet) ---------- */
 function ArchiveSection({state,setState,goDay}){
-  const {profile,goal,days}=state;
+  const {goal,days}=state;
   const [showExport,setShowExport]=useState(false);
   const [q,setQ]=useState('');
   const dayList=useMemo(()=>Object.values(days).filter(d=>d.foods.length>0||d.exercises.length>0).sort((a,b)=>b.date.localeCompare(a.date)).map(d=>{
-    const totals=sumNut(d.foods); const burned=Math.round(d.exercises.reduce((a,e)=>a+(+e.calories||0),0)); const budget=dailyBudget(profile,goal,burned);
+    const totals=sumNut(d.foods); const budget=dailyBudget(goal,d);
     return {...d,totals,budget,over:totals.calories>budget};
-  }),[days,profile,goal]);
+  }),[days,goal]);
   const ql=q.trim().toLowerCase();
   const filtered=ql?dayList.filter(d=>d.foods.some(f=>f.name.toLowerCase().includes(ql))):dayList;
   const groups=useMemo(()=>{const map=new Map();filtered.forEach(d=>{const l=monthLabel(d.date);if(!map.has(l))map.set(l,[]);map.get(l).push(d);});return [...map.entries()];},[filtered]);
@@ -1063,7 +1062,7 @@ function ArchiveSection({state,setState,goDay}){
                 <li className="archive-day" key={d.date}>
                   <button className="archive-open" onClick={()=>goDay(d.date)}>
                     <div className="archive-date"><span className="archive-wd">{weekdayShort(d.date)}</span><span className="archive-label">{dateLabel(d.date)}</span></div>
-                    <div className="archive-meta"><span className="muted small">E {d.totals.protein} · KH {d.totals.carbs} · F {d.totals.fat} g · {d.foods.length} Einträge</span></div>
+                    <div className="archive-meta"><span className="muted small">E {d.totals.protein} · KH {d.totals.carbs} · F {d.totals.fat} g · {d.foods.length} Einträge{d.training?' · Training':''}</span></div>
                     <div className={'archive-kcal'+(d.over?' over':'')}>{d.totals.calories}<span className="muted small"> / {d.budget}</span></div>
                   </button>
                   <button className="del" onClick={()=>del(d.date)}><Icon name="close"/></button>
@@ -1101,16 +1100,13 @@ function ExportOverlay({days,onClose}){
 }
 
 /* ---------- Profil ---------- */
-const PRESETS=[{mode:'lose',label:'Abnehmen (−500)',adj:-500},{mode:'lose',label:'Leicht abnehmen (−300)',adj:-300},{mode:'maintain',label:'Halten (±0)',adj:0},{mode:'gain',label:'Aufbauen (+300)',adj:300},{mode:'gain',label:'Aufbauen (+500)',adj:500}];
 function Profile({state,setState,notify,setDate,goToDash}){
   const {profile,goal}=state;
   const fileRef=useRef(null);
   const setP=p=>setState(s=>({...s,profile:{...s.profile,...p}}));
   const setG=g=>setState(s=>({...s,goal:{...s.goal,...g}}));
-  const tgt=targetMacros(maintenance(profile)+goal.adjustment,goal);
+  const tgtT=targetMacros(+goal.kcalTraining||0,goal), tgtR=targetMacros(+goal.kcalRest||0,goal);
   const macroSum=goal.proteinPct+goal.carbsPct+goal.fatPct;
-  const perWeek=weeklyChange(goal.adjustment);
-  const weeks=weeksToTarget(profile,goal);
   const pickDiet=style=>setG({dietStyle:style,...DIET_MACROS[style]});
   function backup(){const data=JSON.stringify({app:'essen',v:1,exportedAt:new Date().toISOString(),state},null,2);const blob=new Blob([data],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='essen-backup-'+todayKey()+'.json';a.click();URL.revokeObjectURL(url);notify('Backup heruntergeladen');}
   function restoreText(text){try{const o=JSON.parse(text);const data=o&&o.state?o.state:o;if(!data||(!data.days&&!data.profile))throw 0;if(!confirm('Aktuelle Daten durch das Backup ersetzen?'))return;setState(normalizeState(data));notify('Daten wiederhergestellt');}catch(e){alert('Konnte die Datei nicht lesen (kein gültiges Essen-Backup).');}}
@@ -1118,11 +1114,16 @@ function Profile({state,setState,notify,setDate,goToDash}){
   return (
     <div className="page">
       <header className="chat-head"><h2>Profil &amp; Wünsche</h2></header>
-      <div className="tiles">
-        <Stat label="Grundumsatz" value={bmr(profile)} sub="kcal/Tag"/>
-        <Stat label="Erhaltung" value={maintenance(profile)} sub="kcal/Tag"/>
-        <Stat label="Budget-Ziel" value={maintenance(profile)+goal.adjustment} sub="kcal/Tag"/>
-      </div>
+      <section className="card">
+        <h3 className="card-title">Kalorienziel pro Tag</h3>
+        <p className="muted small" style={{marginTop:0}}>Trag deine Zahlen selbst ein – es wird nichts berechnet. Auf „Heute“ bzw. im Dashboard markierst du pro Tag, ob es ein Trainingstag ist.</p>
+        <div className="field-grid two">
+          <div className="field"><label>Trainingstag</label>
+            <div className="num-suffix"><input inputMode="numeric" placeholder="z.B. 2500" value={goal.kcalTraining} onChange={e=>setG({kcalTraining:numDe(e.target.value)})}/><span>kcal</span></div></div>
+          <div className="field"><label>Kein Trainingstag</label>
+            <div className="num-suffix"><input inputMode="numeric" placeholder="z.B. 2000" value={goal.kcalRest} onChange={e=>setG({kcalRest:numDe(e.target.value)})}/><span>kcal</span></div></div>
+        </div>
+      </section>
 
       <section className="card">
         <h3 className="card-title">Über dich</h3>
@@ -1134,20 +1135,15 @@ function Profile({state,setState,notify,setDate,goToDash}){
             <div className="field" key={k}><label>{l}</label>
               <div className="num-suffix"><input inputMode="decimal" value={profile[k]} onChange={e=>setP({[k]:numDe(e.target.value)})}/><span>{u}</span></div></div>))}
         </div>
-        <div className="field"><label>Alltagsaktivität (ohne Sport)</label>
-          <select value={profile.activity} onChange={e=>setP({activity:e.target.value})}>{Object.keys(ACTIVITY).map(a=>(<option key={a} value={a}>{ACTIVITY[a].label}</option>))}</select></div>
       </section>
 
       <section className="card">
         <h3 className="card-title">Dein Ziel</h3>
-        <div className="presets">{PRESETS.map(p=>(<button key={p.label} className={'preset'+(goal.adjustment===p.adj?' on':'')} onClick={()=>setG({adjustment:p.adj})}>{p.label}</button>))}</div>
         <div className="field-grid two">
           <div className="field"><label>Wunschgewicht</label>
             <div className="num-suffix"><input inputMode="decimal" placeholder="–" value={profile.targetWeight??''} onChange={e=>{const t=e.target.value.replace(',','.').trim();setP({targetWeight:t===''?null:(+t||null)});}}/><span>kg</span></div></div>
-          <div className="field"><label>Tempo (geschätzt)</label><div className="num-static">{perWeek>0?'+':''}{perWeek} kg / Woche</div></div>
         </div>
-        {weeks!=null && profile.targetWeight!=null && <p className="muted small">≈ {weeks} Wochen bis {profile.targetWeight} kg (rund {Math.round(weeks/4.3)} Monate) bei diesem Tempo.</p>}
-        <label className="toggle"><input type="checkbox" checked={goal.addExercise} onChange={e=>setG({addExercise:e.target.checked})}/><span>Verbrannte Sportkalorien zum Tagesbudget addieren</span></label>
+        <p className="muted small" style={{margin:0}}>Wird in der Analyse für die Prognose aus deiner tatsächlichen Kalorienbilanz genutzt.</p>
       </section>
 
       <section className="card">
@@ -1159,9 +1155,9 @@ function Profile({state,setState,notify,setDate,goToDash}){
       <section className="card">
         <h3 className="card-title">Makro-Verteilung</h3>
         <p className={'muted small'} style={{color:macroSum!==100?'var(--protein)':'var(--muted)'}}>Summe: {macroSum}% {macroSum!==100?'(sollte 100% sein)':<Icon name="check"/>}</p>
-        {[['proteinPct','Eiweiß','var(--protein)',tgt.protein],['carbsPct','Kohlenhydrate','var(--carbs)',tgt.carbs],['fatPct','Fett','var(--fat)',tgt.fat]].map(([k,l,c,g])=>(
+        {[['proteinPct','Eiweiß','var(--protein)',tgtT.protein,tgtR.protein],['carbsPct','Kohlenhydrate','var(--carbs)',tgtT.carbs,tgtR.carbs],['fatPct','Fett','var(--fat)',tgtT.fat,tgtR.fat]].map(([k,l,c,gT,gR])=>(
           <div className="pct" key={k}>
-            <div className="pct-head"><span style={{color:c}}>● {l}</span><span className="muted">{goal[k]}% · {g} g</span></div>
+            <div className="pct-head"><span style={{color:c}}>● {l}</span><span className="muted">{goal[k]}% · {gT} g (Training) / {gR} g (ohne)</span></div>
             <input type="range" min="0" max="100" step="5" value={goal[k]} onChange={e=>setG({[k]:+e.target.value})}/>
           </div>))}
       </section>
