@@ -1,9 +1,14 @@
 # Essen 🍊 – Kalorien- & Makrotracker
 
 Ein **Kalorien- und Makrotracker in einer einzigen HTML-Datei** – ohne
-Build-Schritt, ohne Server, ohne KI/API und ohne Konto. Einfach
-[`index.html`](index.html) im Browser öffnen. Alle Daten bleiben lokal auf
-dem Gerät (`localStorage`).
+Build-Schritt. Einfach [`index.html`](index.html) im Browser öffnen; ohne
+Anmeldung bleiben alle Daten lokal auf dem Gerät (`localStorage`).
+
+Optional mit **Cloud-Sync und KI-Erfassung** über ein eigenes
+[Supabase](https://supabase.com)-Projekt: Nach dem Login ist der Stand auf
+allen Geräten gleich, und Claude berechnet die Nährwerte direkt in der App
+(Freitext oder Foto) – kein Copy & Paste mehr nötig. Einrichtung: siehe
+[`supabase/README.md`](supabase/README.md).
 
 Desktop-optimiert (Seitenleisten-Navigation, breites Layout, zweispaltige
 Tagesansicht), voll responsiv fürs Handy. Farbschema **Schwarz/Orange**.
@@ -42,6 +47,12 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
 
 ## Funktionen
 
+- **KI-Erfassung** – „Mahlzeit erfassen“ → Freitext („400 g Naturjoghurt,
+  100 g Himbeeren“) oder Foto von Mahlzeit/Verpackung/Nährwerttabelle; Claude
+  liefert die Zeilen im Import-Format, du prüfst die Vorschau und übernimmst.
+  Läuft über eine Supabase Edge Function, der Claude-Key bleibt serverseitig.
+- **Cloud-Sync** – Login per E-Mail (Passwort oder Magic-Link); der neueste
+  Stand gewinnt, lokal bleibt ein Offline-Cache. Hell/Dunkel bleibt pro Gerät.
 - **Erfassung per Copy & Paste** – Tabelle (Tab- oder `|`-getrennt) einfügen;
   **Datum und Mahlzeit werden automatisch zugeordnet**. Mit Vorschau,
   Duplikat-Warnung, „rückgängig" und optionalem Leeren der betroffenen Tage.
@@ -97,13 +108,18 @@ auf der Heute-Seite.
 
 ## Datensicherung
 
-Alle Daten liegen ausschließlich im `localStorage` deines Browsers. Lade unter
-**Profil → 💾 Daten & Sicherung** regelmäßig ein **JSON-Backup** herunter, damit
-beim Leeren des Browser-Speichers nichts verloren geht. Über denselben Bereich
-lässt sich ein Backup wieder einspielen.
+Ohne Anmeldung liegen alle Daten ausschließlich im `localStorage` deines
+Browsers. Lade unter **Profil → 💾 Daten & Sicherung** regelmäßig ein
+**JSON-Backup** herunter, damit beim Leeren des Browser-Speichers nichts
+verloren geht. Über denselben Bereich lässt sich ein Backup wieder einspielen.
+Mit Login liegt der Stand zusätzlich in deiner Supabase-Datenbank.
 
 ## Technik & Datenschutz
 
 - Eine Datei, reines Frontend: React 18 + Babel-Standalone (per CDN), kein Build.
-- Keine Server-Kommunikation, **keine KI/API**, kein Tracking.
-- Persistenz lokal über `localStorage`; Export/Backup als TSV bzw. JSON.
+- Ohne Login: keine Server-Kommunikation, kein Tracking.
+- Mit Login: Daten in deinem eigenen Supabase-Projekt (Row-Level-Security,
+  nur du siehst deine Zeile); KI-Anfragen gehen über deine Edge Function an die
+  Claude-API. Konfiguration in [`config.js`](config.js) (nur der öffentliche
+  Anon-Key), Server-Teil unter [`supabase/`](supabase/).
+- Persistenz lokal über `localStorage` als Cache; Export/Backup als TSV bzw. JSON.

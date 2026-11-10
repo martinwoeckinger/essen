@@ -1,0 +1,7 @@
+# Supabase-CLI-Konfiguration (nur für `supabase functions deploy` nötig).
+project_id = "jfseqzzsobwdjpdwwsye"
+
+[functions.nutrition]
+# Die Function prüft den Login selbst (auth.getUser); die Gateway-Prüfung bleibt aus,
+# damit auch die neuen Publishable-Keys funktionieren.
+verify_jwt = false
