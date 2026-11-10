@@ -9,6 +9,9 @@ create table if not exists public.essen_state (
 
 alter table public.essen_state enable row level security;
 
+-- Tabellenrechte für angemeldete Nutzer (RLS schränkt dann auf die eigene Zeile ein).
+grant select, insert, update, delete on public.essen_state to authenticated;
+
 -- Jeder Nutzer sieht und ändert ausschließlich seine eigene Zeile.
 drop policy if exists "essen_state_select_own" on public.essen_state;
 create policy "essen_state_select_own" on public.essen_state

@@ -45,8 +45,10 @@ supabase secrets set ANTHROPIC_API_KEY=sk-ant-DEIN-KEY
 supabase functions deploy nutrition
 ```
 
-Der Claude-Key liegt danach nur als Secret auf Supabase. Die Function
-akzeptiert ausschließlich Anfragen angemeldeter Nutzer (JWT-Prüfung) und ruft
+Der Claude-Key liegt danach nur als Secret auf Supabase (alternativ im
+Dashboard unter **Edge Functions → Secrets** eintragen). Die Function
+akzeptiert ausschließlich Anfragen angemeldeter Nutzer (sie prüft das JWT
+selbst per `auth.getUser`) und ruft
 `claude-opus-5-5` mit Structured Outputs auf, sodass die Antwort garantiert im
 Spaltenformat der App ankommt. Refusal-Fallbacks sind aktiviert
 (`fallbacks: "default"`): lehnt das Modell eine Anfrage ab, übernimmt
@@ -57,9 +59,10 @@ Logs: Dashboard → **Edge Functions → nutrition → Logs**.
 ## 4. Anon-Key in die App eintragen
 
 Dashboard → **Project Settings → API** → *Project API keys* → `anon public`
-kopieren und in [`../config.js`](../config.js) bei `supabaseAnonKey` eintragen.
-Der Anon-Key ist öffentlich (er steht in jeder Supabase-Web-App im Quelltext);
-die Sicherheit kommt aus Login + Row-Level-Security.
+kopieren und in [`../config.js`](../config.js) bei `supabaseAnonKey` eintragen
+(für dieses Projekt bereits erledigt). Der Anon-Key ist öffentlich (er steht in
+jeder Supabase-Web-App im Quelltext); die Sicherheit kommt aus Login +
+Row-Level-Security.
 
 Alternativ lässt sich der Key in der App unter **Profil → Cloud & KI**
 einmalig eintragen (wird nur in diesem Browser gespeichert).
