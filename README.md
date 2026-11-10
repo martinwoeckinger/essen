@@ -10,8 +10,8 @@ allen Geräten gleich, und Claude berechnet die Nährwerte direkt in der App
 (Freitext oder Foto) – kein Copy & Paste mehr nötig. Einrichtung: siehe
 [`supabase/README.md`](supabase/README.md).
 
-Desktop-optimiert (Seitenleisten-Navigation, breites Layout, zweispaltige
-Tagesansicht), voll responsiv fürs Handy. Farbschema **Schwarz/Orange**.
+Desktop-optimiert (Seitenleiste, zweispaltige Tagesansicht mit kompakten
+Einträgen, Tastenkürzel), voll responsiv fürs Handy. Farbschema **Schwarz/Orange**.
 
 ## Schnellstart
 
@@ -97,13 +97,27 @@ Beispiel (deutsche Kommazahlen und Notizen mit Kommas sind erlaubt):
 Aufrufbar über **„📋 Import"** (mit Vorschau) oder **„⚡ Einfügen"** (direkt)
 auf der Heute-Seite.
 
-## Tastenkürzel (Desktop)
+## Desktop
+
+Ab 900 px Breite: Seitenleiste statt Tab-Leiste, **Archiv** als eigener
+Bereich, Kopfzeile mit Datum links und Aktionen rechts, unten in der Leiste der
+heutige Rest-kcal-Stand. Ab 1140 px zeigt „Heute" die Mahlzeiten als kompakte
+Zeilen und rechts daneben die Tageszusammenfassung (Ring, Makros, weitere
+Nährwerte, Tagestyp). Der Zustand steht in der URL (`#heute/2026-11-10`), damit
+Reload, Zurück/Vor und Lesezeichen funktionieren.
+
+### Tastenkürzel
 
 | Taste | Aktion |
 |------|--------|
-| `←` / `→` | Tag wechseln (auf „Heute") |
+| `1` … `5` | Dashboard · Heute · Analyse · Archiv · Profil |
+| `←` / `→` | Tag wechseln (Dashboard, „Heute") |
 | `t` | Zum heutigen Tag springen |
-| `i` | Import öffnen |
+| `k` | KI-Erfassung öffnen |
+| `i` | Tabelle einfügen |
+| `n` | Mahlzeit manuell eintragen |
+| `g` | Gestern übernehmen |
+| `?` | Übersicht der Kürzel |
 | `Esc` | Dialog schließen |
 
 ## Datensicherung
