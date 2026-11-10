@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
 <meta name="theme-color" content="#0a0a0a" />
-<meta name="description" content="Essen – Kalorien- und Makrotracker. Offline, eine Datei, ohne Konto." />
+<meta name="description" content="Essen – Kalorien- und Makrotracker mit KI-Erfassung und Cloud-Sync." />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -13,6 +13,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.0/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&display=swap" rel="stylesheet"/>
@@ -210,6 +212,13 @@ html,body,#root{height:100%;margin:0}
   .import-success{ @apply flex items-center gap-2; font-weight:700;font-size:16px;margin:0 0 8px; }
   .import-success .msym{ color:var(--good);font-size:22px; }
   .import-submit{ width:100%; }
+  .import-mode{ margin:0; } .import-mode button{ @apply inline-flex items-center justify-center gap-1.5; } .import-mode .msym{ font-size:18px; }
+  .ai-photo{ display:block;max-width:100%;max-height:220px;border-radius:12px;margin-top:10px;border:1px solid var(--line); }
+  .ai-err{ @apply flex items-start gap-1.5; color:var(--danger);font-size:13px;font-weight:600;margin:10px 0 0; } .ai-err .msym{ font-size:18px;flex:none; }
+  .ai-note{ @apply flex items-start gap-1.5; } .ai-note .msym{ font-size:18px;flex:none;color:var(--accent); }
+  .cloud-status{ @apply flex items-center gap-1.5 text-onvar; font-size:13px;font-weight:600;margin:0 0 10px; } .cloud-status .msym{ font-size:18px;color:var(--good); } .cloud-status.error .msym{ color:var(--danger); } .cloud-status.syncing .msym{ color:var(--accent); }
+  .cloud-tab.error .tab-icon{ color:var(--danger); }
+  @keyframes spin{ to{ transform:rotate(360deg); } } .spin{ animation:spin 1s linear infinite; }
   .preview-meal{ margin-top:8px; }
   .preview-meal-head{ font-size:13px;font-weight:700;color:var(--accent2);margin:6px 0 2px; }
   .preview-row{ @apply flex justify-between gap-2.5; font-size:13px;padding:3px 0; }
@@ -300,7 +309,7 @@ html,body,#root{height:100%;margin:0}
 <body>
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useMemo } = React;
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
 /* ---------- Icon (Google Material Symbols) ---------- */
 const Icon = ({name,className,style}) => (
@@ -410,7 +419,7 @@ const IMPORT_EXAMPLE=[
 const DEFAULTS = {
   profile:{name:'',sex:'male',age:30,height:180,weight:80,targetWeight:null},
   goal:{kcalTraining:2500,kcalRest:2000,proteinTraining:150,carbsTraining:280,fatTraining:80,proteinRest:150,carbsRest:180,fatRest:75,fiberGoal:30,sugarLimit:50,saltLimit:6,satFatLimit:20,preferences:''},
-  days:{},favorites:[],ui:{theme:'light',collapsedMeals:{}},
+  days:{},favorites:[],ui:{theme:'light',collapsedMeals:{}},meta:{updatedAt:''},
 };
 function migrateDays(days){
   const out={};
@@ -441,10 +450,125 @@ function normalizeState(p){
     days:migrateDays(p.days),
     favorites:Array.isArray(p.favorites)?p.favorites:[],
     ui:{...DEFAULTS.ui,...(p.ui||{})},
+    meta:{updatedAt:(p.meta&&p.meta.updatedAt)||''},
   };
 }
 function load(){ try{const s=localStorage.getItem('essen-artifact');if(s)return normalizeState(JSON.parse(s));}catch(e){} return JSON.parse(JSON.stringify(DEFAULTS)); }
 function save(s){ try{localStorage.setItem('essen-artifact',JSON.stringify(s));}catch(e){} }
+
+/* ---------- Cloud (Supabase): Login, Sync, KI-Erfassung ---------- */
+const CLOUD_CFG_KEY='essen-cloud-config';
+function cloudConfig(){
+  const base=window.ESSEN_CONFIG||{}; let local={};
+  try{local=JSON.parse(localStorage.getItem(CLOUD_CFG_KEY)||'{}')||{};}catch(e){}
+  return {url:String(local.url||base.supabaseUrl||'').trim().replace(/\/+$/,''),anonKey:String(local.anonKey||base.supabaseAnonKey||'').trim()};
+}
+function saveCloudConfig(c){ try{localStorage.setItem(CLOUD_CFG_KEY,JSON.stringify(c));}catch(e){} }
+let _sb=null;
+function sb(){
+  if(_sb)return _sb;
+  const c=cloudConfig(); if(!c.url||!c.anonKey||!window.supabase)return null;
+  try{_sb=window.supabase.createClient(c.url,c.anonKey);}catch(e){console.error(e);return null;}
+  return _sb;
+}
+const SYNC_KEYS=['profile','goal','days','favorites'];
+const syncable = s => ({profile:s.profile,goal:s.goal,days:s.days,favorites:s.favorites});
+const hasData = s => Object.keys(s.days||{}).length>0 || (s.favorites||[]).length>0;
+const ts = v => { const n=Date.parse(v||''); return isFinite(n)?n:0; };
+async function cloudPull(userId){
+  const {data,error}=await sb().from('essen_state').select('data,updated_at').eq('user_id',userId).maybeSingle();
+  if(error)throw error; return data;
+}
+/* Upload nur, wenn der Cloud-Stand nicht neuer ist (bedingtes Update). Rückgabe: 'updated' | 'inserted' | 'stale'. */
+async function cloudPush(userId,state){
+  const at=state.meta.updatedAt; const payload={user_id:userId,data:syncable(state),updated_at:at};
+  const {data,error}=await sb().from('essen_state').update(payload).eq('user_id',userId).lt('updated_at',at).select('updated_at');
+  if(error)throw error;
+  if(data&&data.length)return 'updated';
+  const {data:row,error:e2}=await sb().from('essen_state').select('updated_at').eq('user_id',userId).maybeSingle();
+  if(e2)throw e2;
+  if(!row){const {error:e3}=await sb().from('essen_state').insert(payload);if(e3)throw e3;return 'inserted';}
+  return 'stale';
+}
+async function cloudNutrition(payload){
+  const {data,error}=await sb().functions.invoke('nutrition',{body:payload});
+  if(error){
+    let msg=error.message||'Fehler bei der KI-Erfassung';
+    try{const ctx=error.context;if(ctx&&typeof ctx.json==='function'){const j=await ctx.json();if(j&&j.error)msg=j.error;}}catch(e){}
+    throw new Error(msg);
+  }
+  if(data&&data.error)throw new Error(data.error);
+  return data||{};
+}
+const cloudErrMsg = e => { const m=(e&&e.message)||String(e||''); return /Failed to fetch|NetworkError|Load failed/i.test(m)?'Keine Verbindung zur Cloud (offline?)':m; };
+function useCloud(state,rawSet,notify){
+  const client=sb(); const configured=!!client;
+  const [user,setUser]=useState(null);
+  const [status,setStatus]=useState('off'); // off | idle | syncing | error
+  const [err,setErr]=useState(null);
+  const [lastSync,setLastSync]=useState(null);
+  const stateRef=useRef(state); stateRef.current=state;
+  const pushedRef=useRef(null); const busyRef=useRef(false);
+  useEffect(()=>{
+    if(!client)return; let active=true;
+    client.auth.getSession().then(({data})=>{if(active)setUser(data&&data.session?data.session.user:null);}).catch(()=>{});
+    const {data:sub}=client.auth.onAuthStateChange((_ev,session)=>{setUser(session?session.user:null);});
+    return ()=>{active=false;try{sub.subscription.unsubscribe();}catch(e){}};
+  },[client]);
+  const adoptCloud=useCallback((row)=>{
+    const at=new Date(row.updated_at).toISOString();
+    rawSet(s=>{
+      if(pushedRef.current===null&&hasData(s)){try{localStorage.setItem('essen-prev-local',JSON.stringify(s));}catch(e){}}
+      return {...normalizeState({...(row.data||{}),ui:s.ui}),meta:{updatedAt:at}};
+    });
+    pushedRef.current=at;
+  },[rawSet]);
+  const sync=useCallback(async(reason)=>{
+    if(!client||!user||busyRef.current)return; busyRef.current=true; setStatus('syncing');
+    try{
+      const row=await cloudPull(user.id); const local=stateRef.current; const localAt=local.meta.updatedAt||'';
+      const cloudAt=row?ts(row.updated_at):0;
+      if(row&&cloudAt>ts(localAt)){ adoptCloud(row); if(reason!=='login')notify('Neuer Stand aus der Cloud übernommen'); }
+      else if(!row&&(localAt||hasData(local))){
+        const st={...local,meta:{updatedAt:localAt||new Date().toISOString()}};
+        if(!localAt)rawSet(s=>({...s,meta:st.meta}));
+        await cloudPush(user.id,st); pushedRef.current=st.meta.updatedAt;
+      }
+      else if(row&&localAt&&ts(localAt)>cloudAt){ const r=await cloudPush(user.id,local); if(r==='stale'){const row2=await cloudPull(user.id);if(row2)adoptCloud(row2);} else pushedRef.current=localAt; }
+      else { pushedRef.current=localAt||(row?new Date(row.updated_at).toISOString():null); }
+      setLastSync(new Date()); setStatus('idle'); setErr(null);
+    }catch(e){ setStatus('error'); setErr(cloudErrMsg(e)); }
+    finally{ busyRef.current=false; }
+  },[client,user,adoptCloud,rawSet,notify]);
+  // Login → Erstabgleich; Logout → aus
+  useEffect(()=>{ if(!user){pushedRef.current=null;setStatus(configured?'off':'off');setLastSync(null);return;} sync('login'); },[user]);
+  // Lokale Änderung → verzögert hochladen
+  useEffect(()=>{
+    if(!client||!user)return; const at=state.meta.updatedAt; if(!at||at===pushedRef.current)return;
+    const t=setTimeout(async()=>{
+      if(busyRef.current){return;} busyRef.current=true; setStatus('syncing');
+      try{ const r=await cloudPush(user.id,stateRef.current); if(r==='stale'){const row=await cloudPull(user.id);if(row){adoptCloud(row);notify('Cloud war neuer – Stand übernommen');}} else pushedRef.current=stateRef.current.meta.updatedAt; setLastSync(new Date()); setStatus('idle'); setErr(null); }
+      catch(e){ setStatus('error'); setErr(cloudErrMsg(e)); }
+      finally{ busyRef.current=false; }
+    },1200);
+    return ()=>clearTimeout(t);
+  },[state.meta.updatedAt,client,user]);
+  // Fokus/Sichtbarkeit + Intervall → nachladen
+  useEffect(()=>{
+    if(!client||!user)return;
+    const onVis=()=>{if(document.visibilityState==='visible')sync('focus');};
+    window.addEventListener('focus',onVis); document.addEventListener('visibilitychange',onVis);
+    const iv=setInterval(()=>{if(document.visibilityState==='visible')sync('interval');},90000);
+    return ()=>{window.removeEventListener('focus',onVis);document.removeEventListener('visibilitychange',onVis);clearInterval(iv);};
+  },[client,user,sync]);
+  const auth={
+    signIn:(email,password)=>client.auth.signInWithPassword({email,password}),
+    signUp:(email,password)=>client.auth.signUp({email,password,options:{emailRedirectTo:location.href.split('#')[0].split('?')[0]}}),
+    magicLink:(email)=>client.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0].split('?')[0]}}),
+    signOut:()=>client.auth.signOut(),
+  };
+  return {configured,client,user,status:user?status:'off',err,lastSync,sync,auth};
+}
 
 /* ---------- State-Helfer ---------- */
 function addFoodTo(setState,date,food){
@@ -628,8 +752,74 @@ function DayShareOverlay({state,date,onClose}){
   );
 }
 
+/* ---------- KI-Erfassung (Claude über Supabase Edge Function) ---------- */
+function rowsToTsv(rows){
+  return rows.map(r=>[deDate(r.date),MEALS[r.meal].label,r.name,r.quantity||'',deNum(r.calories),deNum(r.protein),deNum(r.carbs),deNum(r.sugar),deNum(r.fat),deNum(r.saturatedFat),deNum(r.fiber),deNum(r.salt),(r.note||'').replace(/[\t\n]+/g,' ')].join('\t')).join('\n');
+}
+function shrinkImage(file,max=1280){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file); const img=new Image();
+    img.onload=()=>{
+      try{
+        const sc=Math.min(1,max/Math.max(img.width,img.height)); const w=Math.round(img.width*sc),h=Math.round(img.height*sc);
+        const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+        const dataUrl=c.toDataURL('image/jpeg',0.85); URL.revokeObjectURL(url);
+        resolve({media_type:'image/jpeg',data:dataUrl.split(',')[1],preview:dataUrl});
+      }catch(e){reject(e);}
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Bild konnte nicht geladen werden'));};
+    img.src=url;
+  });
+}
+function AiCapture({state,cloud,date,onRows}){
+  const [desc,setDesc]=useState(''),[aiDate,setAiDate]=useState(date||todayKey()),[meal,setMeal]=useState(defaultMeal());
+  const [img,setImg]=useState(null),[busy,setBusy]=useState(false),[err,setErr]=useState(null),[hint,setHint]=useState(null);
+  const fileRef=useRef(null);
+  async function onFile(e){const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;setErr(null);try{setImg(await shrinkImage(f));}catch(x){setErr('Foto konnte nicht gelesen werden.');}}
+  async function run(){
+    if(busy)return; if(!desc.trim()&&!img){setErr('Bitte beschreiben, was du gegessen hast – oder ein Foto wählen.');return;}
+    setBusy(true);setErr(null);setHint(null);
+    try{
+      const res=await cloudNutrition({text:desc,image:img?{media_type:img.media_type,data:img.data}:null,date:aiDate,meal:meal==='auto'?null:meal,preferences:state.goal.preferences||''});
+      const rows=(res.rows||[]).map(r=>({...r,date:aiDate,meal:meal==='auto'?(MEALS[r.meal]?r.meal:'snack'):meal}));
+      if(!rows.length)throw new Error(res.note||'Keine Lebensmittel erkannt.');
+      onRows(rows,res.note||''); setDesc(''); setImg(null);
+    }catch(x){setErr(cloudErrMsg(x));}
+    finally{setBusy(false);}
+  }
+  if(!cloud||!cloud.configured) return (<div className="card"><p className="muted small" style={{margin:0}}>Die KI-Erfassung braucht die Cloud-Anbindung. Richte sie unter <strong>Profil → Cloud &amp; KI</strong> ein.</p></div>);
+  if(!cloud.user) return (<div className="card"><p className="muted small" style={{margin:0}}>Für die KI-Erfassung bitte unter <strong>Profil → Cloud &amp; KI</strong> anmelden. Die Berechnung läuft über deinen Claude-Zugang auf dem Server.</p></div>);
+  return (
+    <div className="card">
+      <p className="muted small" style={{marginTop:0}}>Beschreib frei, was du gegessen hast (Mengen helfen) – oder fotografiere Mahlzeit, Verpackung oder Nährwerttabelle. Claude schätzt die Nährwerte, du prüfst die Vorschau.</p>
+      <textarea className="pref-text" placeholder="z.B. 400 g Naturjoghurt 3,5 %, 100 g Himbeeren, 1 Proteinriegel" value={desc} onChange={e=>setDesc(e.target.value)} rows={4} disabled={busy}/>
+      <div className="field-grid two" style={{marginTop:10}}>
+        <div className="field"><label>Datum</label><input type="date" value={aiDate} max={todayKey()} onChange={e=>{if(e.target.value)setAiDate(e.target.value);}} disabled={busy}/></div>
+        <div className="field"><label>Mahlzeit</label>
+          <select value={meal} onChange={e=>setMeal(e.target.value)} disabled={busy}>
+            {MEAL_ORDER.map(m=><option key={m} value={m}>{MEALS[m].label}</option>)}
+            <option value="auto">Automatisch (aus dem Text)</option>
+          </select></div>
+      </div>
+      <div className="import-actions">
+        <button className="chip" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}><Icon name="photo_camera"/> {img?'Anderes Foto':'Foto'}</button>
+        {img&&<button className="chip" onClick={()=>setImg(null)} disabled={busy}><Icon name="close"/> Foto entfernen</button>}
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={onFile}/>
+      </div>
+      {img&&<img className="ai-photo" src={img.preview} alt="Gewähltes Foto"/>}
+      {err&&<p className="ai-err"><Icon name="error"/> {err}</p>}
+      {hint&&<p className="muted small">{hint}</p>}
+      <button className="primary import-submit" style={{marginTop:12}} onClick={run} disabled={busy}>
+        {busy?<><Icon name="progress_activity" className="spin"/> Claude rechnet …</>:<><Icon name="auto_awesome"/> Nährwerte berechnen</>}
+      </button>
+    </div>
+  );
+}
+
 /* ---------- Import-Overlay ---------- */
-function ImportPanel({state,setState,setDate,onClose}){
+function ImportPanel({state,setState,setDate,onClose,cloud,date,notify}){
+  const [mode,setMode]=useState(cloud&&cloud.user?'ai':'table');
+  const [aiNote,setAiNote]=useState(null);
   const [text,setText]=useState('');
   const [replace,setReplace]=useState(false);
   const [done,setDone]=useState(null);
@@ -656,19 +846,31 @@ function ImportPanel({state,setState,setDate,onClose}){
     </Overlay>
   );
 
+  function onAiRows(rows,note){
+    setText(prev=>(prev.trim()?prev.replace(/\s+$/,'')+'\n':'')+rowsToTsv(rows));
+    setAiNote(note||null); setMode('table');
+    if(notify)notify(rows.length+' Einträge berechnet – bitte prüfen');
+  }
+
   return (
-    <Overlay title="Strukturiert importieren" onClose={onClose}>
-      <div className="card">
-        <p className="muted small" style={{marginTop:0}}>Tabelle aus der Zwischenablage einfügen (Tab- oder |-getrennt). Spaltenreihenfolge:</p>
+    <Overlay title="Mahlzeit erfassen" onClose={onClose}>
+      <div className="seg full import-mode">
+        <button className={mode==='ai'?'on':''} onClick={()=>setMode('ai')}><Icon name="auto_awesome"/> KI-Erfassung</button>
+        <button className={mode==='table'?'on':''} onClick={()=>setMode('table')}><Icon name="content_paste"/> Tabelle einfügen</button>
+      </div>
+      {mode==='ai' && <AiCapture state={state} cloud={cloud} date={date} onRows={onAiRows}/>}
+      {mode==='table' && <div className="card">
+        {aiNote && <p className="muted small ai-note" style={{marginTop:0}}><Icon name="info"/> Hinweis von Claude: {aiNote}</p>}
+        <p className="muted small" style={{marginTop:0}}>Tabelle aus der Zwischenablage einfügen (Tab- oder |-getrennt) oder das KI-Ergebnis hier nachbearbeiten. Spaltenreihenfolge:</p>
         <code className="import-cols">Datum · Mahlzeit · Nahrungsmittel · Menge · kcal · Eiweiß · KH · Zucker · Fett · ges. FS · Ballaststoffe · Salz · Notiz</code>
         <textarea className="import-text" placeholder="Hier die Tabelle einfügen…" value={text} onChange={e=>setText(e.target.value)} rows={8} spellCheck={false}/>
         <div className="import-actions">
           <button className="chip" onClick={()=>setText(IMPORT_EXAMPLE)}>Beispiel einfügen</button>
-          {text && <button className="chip" onClick={()=>setText('')}>Leeren</button>}
+          {text && <button className="chip" onClick={()=>{setText('');setAiNote(null);}}>Leeren</button>}
         </div>
-      </div>
+      </div>}
 
-      {result.errors.length>0 && (
+      {mode==='table' && result.errors.length>0 && (
         <div className="card import-warn">
           <h3 className="card-title"><Icon name="warning"/> {result.errors.length} Zeile(n) übersprungen</h3>
           <ul className="err-list">
@@ -678,7 +880,7 @@ function ImportPanel({state,setState,setDate,onClose}){
         </div>
       )}
 
-      {result.rows.length>0 && (<>
+      {mode==='table' && result.rows.length>0 && (<>
         <div className="card"><div className="hero-stats">
           <Stat label="Einträge" value={result.rows.length}/>
           <Stat label={byDate.length===1?'Tag':'Tage'} value={byDate.length}/>
@@ -705,7 +907,7 @@ function ImportPanel({state,setState,setDate,onClose}){
         <button className="primary import-submit" onClick={doImport}>{result.rows.length} Einträge importieren</button>
       </>)}
 
-      {!result.rows.length && !result.errors.length && text.trim()==='' &&
+      {mode==='table' && !result.rows.length && !result.errors.length && text.trim()==='' &&
         <p className="empty">Noch nichts eingefügt. Tippe auf „Beispiel einfügen", um es auszuprobieren.</p>}
     </Overlay>
   );
@@ -871,7 +1073,7 @@ function Today({state,setState,date,setDate,openImport,notify}){
             <button className="chip" onClick={()=>{setEditId(null);setOpenF(o=>!o);}}>{openF?<Icon name="close"/>:<><Icon name="add"/> manuell</>}</button>
           </div></div>
         {openF && <FoodForm onSubmit={f=>{addFoodTo(setState,date,f);setOpenF(false);notify('Eingetragen: '+f.name);}}/>}
-        {day.foods.length===0 && !openF && <p className="empty">Noch nichts erfasst. Tippe auf „＋ Mahlzeit erfassen" (Tabelle einfügen) oder „+ manuell".</p>}
+        {day.foods.length===0 && !openF && <p className="empty">Noch nichts erfasst. Tippe auf „＋ Mahlzeit erfassen" (KI oder Tabelle) oder „+ manuell".</p>}
         {MEAL_ORDER.map(meal=>{
           const items=day.foods.filter(f=>f.meal===meal); if(!items.length)return null;
           const isColl=!!collapsedMeals[meal];
@@ -1110,7 +1312,43 @@ function ExportOverlay({days,onClose}){
 }
 
 /* ---------- Profil ---------- */
-function Profile({state,setState,notify,setDate,goToDash}){
+function CloudCard({cloud,notify}){
+  const [email,setEmail]=useState(''),[pw,setPw]=useState(''),[busy,setBusy]=useState(false),[msg,setMsg]=useState(null),[anon,setAnon]=useState('');
+  const run=async(fn,okMsg)=>{setBusy(true);setMsg(null);try{const {error}=await fn();if(error)throw error;if(okMsg){setMsg(okMsg);}}catch(e){setMsg(cloudErrMsg(e));}finally{setBusy(false);}};
+  const statusText={idle:'Synchron',syncing:'Synchronisiere …',error:'Fehler: '+(cloud.err||''),off:'Nicht angemeldet'}[cloud.status]||'';
+  if(!cloud.configured) return (
+    <section className="card">
+      <h3 className="card-title"><Icon name="cloud"/> Cloud &amp; KI</h3>
+      <p className="muted small" style={{marginTop:0}}>Noch nicht eingerichtet. Trag den <strong>anon public</strong>-Key deines Supabase-Projekts ein (Dashboard → Project Settings → API) – oder direkt in <code>config.js</code>, dann gilt er auf allen Geräten.</p>
+      <div className="field"><label>Supabase Anon-Key</label><input value={anon} onChange={e=>setAnon(e.target.value)} placeholder="eyJ…" spellCheck={false}/></div>
+      <div className="import-actions"><button className="chip" disabled={!anon.trim()} onClick={()=>{saveCloudConfig({anonKey:anon.trim()});location.reload();}}><Icon name="save"/> Speichern &amp; neu laden</button></div>
+    </section>);
+  if(!cloud.user) return (
+    <section className="card">
+      <h3 className="card-title"><Icon name="cloud"/> Cloud &amp; KI</h3>
+      <p className="muted small" style={{marginTop:0}}>Anmelden, damit deine Daten auf allen Geräten gleich sind und die KI-Erfassung funktioniert.</p>
+      <div className="field"><label>E-Mail</label><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} disabled={busy}/></div>
+      <div className="field"><label>Passwort</label><input type="password" autoComplete="current-password" value={pw} onChange={e=>setPw(e.target.value)} disabled={busy}/></div>
+      <div className="import-actions">
+        <button className="primary" disabled={busy||!email||!pw} onClick={()=>run(()=>cloud.auth.signIn(email,pw))}><Icon name="login"/> Anmelden</button>
+        <button className="chip" disabled={busy||!email||!pw} onClick={()=>run(()=>cloud.auth.signUp(email,pw),'Registriert – bitte E-Mail bestätigen, dann anmelden.')}><Icon name="person_add"/> Registrieren</button>
+        <button className="chip" disabled={busy||!email} onClick={()=>run(()=>cloud.auth.magicLink(email),'Login-Link per E-Mail gesendet.')}><Icon name="mail"/> Magic-Link</button>
+      </div>
+      {msg&&<p className="muted small" style={{marginBottom:0}}>{msg}</p>}
+    </section>);
+  return (
+    <section className="card">
+      <h3 className="card-title"><Icon name="cloud_done"/> Cloud &amp; KI</h3>
+      <p className="muted small" style={{marginTop:0}}>Angemeldet als <strong>{cloud.user.email}</strong>. Änderungen werden automatisch gesichert; beim Öffnen auf einem anderen Gerät gilt der neueste Stand.</p>
+      <p className={'cloud-status '+cloud.status}><Icon name={cloud.status==='syncing'?'cloud_sync':cloud.status==='error'?'cloud_off':'cloud_done'}/> {statusText}{cloud.lastSync&&cloud.status!=='syncing'?' · zuletzt '+cloud.lastSync.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):''}</p>
+      <div className="import-actions">
+        <button className="chip" disabled={cloud.status==='syncing'} onClick={()=>cloud.sync('manual')}><Icon name="sync"/> Jetzt abgleichen</button>
+        <button className="chip" disabled={busy} onClick={()=>run(()=>cloud.auth.signOut(),null).then(()=>notify('Abgemeldet'))}><Icon name="logout"/> Abmelden</button>
+      </div>
+      {msg&&<p className="muted small" style={{marginBottom:0}}>{msg}</p>}
+    </section>);
+}
+function Profile({state,setState,notify,setDate,goToDash,cloud}){
   const {profile,goal}=state;
   const fileRef=useRef(null);
   const setP=p=>setState(s=>({...s,profile:{...s.profile,...p}}));
@@ -1185,11 +1423,13 @@ function Profile({state,setState,notify,setDate,goToDash}){
         <textarea className="pref-text" placeholder="z.B. vegetarisch, keine Laktose, mag kein Fisch, viel Gemüse …" value={goal.preferences} onChange={e=>setG({preferences:e.target.value})} rows={3}/>
       </section>
 
+      <CloudCard cloud={cloud} notify={notify}/>
+
       <ArchiveSection state={state} setState={setState} goDay={d=>{setDate(d);goToDash();}}/>
 
       <section className="card">
         <h3 className="card-title"><Icon name="save"/> Daten &amp; Sicherung</h3>
-        <p className="muted small" style={{marginTop:0}}>Alle Daten liegen nur in diesem Browser. Lade regelmäßig ein Backup herunter, damit nichts verloren geht.</p>
+        <p className="muted small" style={{marginTop:0}}>{cloud.user?'Zusätzlich zur Cloud kannst du jederzeit ein JSON-Backup herunterladen.':'Ohne Anmeldung liegen alle Daten nur in diesem Browser. Lade regelmäßig ein Backup herunter, damit nichts verloren geht.'}</p>
         <div className="import-actions">
           <button className="chip" onClick={backup}><Icon name="download"/> Backup (JSON)</button>
           <button className="chip" onClick={()=>fileRef.current&&fileRef.current.click()}><Icon name="upload"/> Wiederherstellen</button>
@@ -1197,7 +1437,7 @@ function Profile({state,setState,notify,setDate,goToDash}){
         </div>
       </section>
 
-      <p className="footer-note">Daten bleiben lokal in diesem Browser (offline-fähig). Erfassung per „Import“ (Copy &amp; Paste) oder „+ manuell“.</p>
+      <p className="footer-note">{cloud.user?'Daten werden in der Cloud gesichert und lokal zwischengespeichert (offline-fähig).':'Daten bleiben lokal in diesem Browser (offline-fähig).'} Erfassung per KI, Tabelle (Copy &amp; Paste) oder „+ manuell“.</p>
     </div>
   );
 }
@@ -1205,13 +1445,17 @@ function Profile({state,setState,notify,setDate,goToDash}){
 /* ---------- App ---------- */
 const TABS=[{id:'dashboard',label:'Dashboard',icon:'space_dashboard'},{id:'today',label:'Heute',icon:'restaurant'},{id:'stats',label:'Analyse',icon:'insights'},{id:'profile',label:'Profil',icon:'settings'}];
 function App(){
-  const [state,setState]=useState(load);
+  const [state,rawSet]=useState(load);
+  /* Jede inhaltliche Änderung (nicht: Darstellung) bekommt einen Zeitstempel – Basis für den Cloud-Abgleich. */
+  const setState=useCallback(upd=>rawSet(s=>{const n=typeof upd==='function'?upd(s):upd;if(n===s)return s;const changed=SYNC_KEYS.some(k=>n[k]!==s[k]);return changed?{...n,meta:{...(n.meta||{}),updatedAt:new Date().toISOString()}}:n;}),[]);
   const [tab,setTab]=useState('dashboard');
   const [date,setDate]=useState(todayKey());
   const [importOpen,setImportOpen]=useState(false);
   const [toast,setToast]=useState(null);
   useEffect(()=>{save(state);},[state]);
-  const notify=msg=>{setToast(msg);clearTimeout(notify._t);notify._t=setTimeout(()=>setToast(null),1900);};
+  const toastT=useRef(null);
+  const notify=useCallback(msg=>{setToast(msg);clearTimeout(toastT.current);toastT.current=setTimeout(()=>setToast(null),1900);},[]);
+  const cloud=useCloud(state,rawSet,notify);
 
   const theme=(state.ui&&state.ui.theme==='dark')?'dark':'light';
   useEffect(()=>{
@@ -1245,7 +1489,7 @@ function App(){
         {tab==='dashboard' && <Dashboard state={state} setState={setState} date={date} setDate={setDate} openImport={()=>setImportOpen(true)}/>}
         {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={()=>setImportOpen(true)} notify={notify}/>}
         {tab==='stats' && <Stats state={state} setDate={setDate} goToToday={()=>setTab('dashboard')}/>}
-        {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')}/>}
+        {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud}/>}
       </main>
       <nav className="tabbar">
         <div className="brand"><span className="brand-icon"><Icon name="nutrition"/></span><span className="brand-name">Essen</span></div>
@@ -1255,8 +1499,11 @@ function App(){
         <button className="tab theme-toggle" onClick={toggleTheme} title="Hell/Dunkel umschalten" aria-label="Design umschalten">
           <span className="tab-icon"><Icon name={theme==='dark'?'light_mode':'dark_mode'}/></span>
           <span className="tab-label">{theme==='dark'?'Hell':'Dunkel'}</span></button>
+        {cloud.configured && <button className={'tab cloud-tab '+cloud.status} onClick={()=>setTab('profile')} title={cloud.user?('Cloud: '+(cloud.err||cloud.status)):'Cloud: nicht angemeldet'} aria-label="Cloud-Status">
+          <span className="tab-icon"><Icon name={!cloud.user?'cloud_off':cloud.status==='syncing'?'cloud_sync':cloud.status==='error'?'cloud_alert':'cloud_done'}/></span>
+          <span className="tab-label">{!cloud.user?'Offline':cloud.status==='syncing'?'Sync …':cloud.status==='error'?'Fehler':'Cloud'}</span></button>}
       </nav>
-      {importOpen && <ImportPanel state={state} setState={setState} setDate={setDate} onClose={()=>setImportOpen(false)}/>}
+      {importOpen && <ImportPanel state={state} setState={setState} setDate={setDate} onClose={()=>setImportOpen(false)} cloud={cloud} date={date} notify={notify}/>}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
