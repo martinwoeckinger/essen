@@ -9,6 +9,9 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Essen" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon-180.png" />
 <title>Essen – Kalorientracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
@@ -36,7 +39,7 @@
   --danger:#c0341d;--track:#e6dfd5;--line:rgba(0,0,0,.09);
   --protein:#059669;--carbs:#0284c7;--fat:#9333ea;--fiber:#65a30d;--sugar:#db2777;--satfat:#e11d48;--salt:#64748b;--data:#2563eb;--good:#16a34a;
   --bar-bg:rgba(255,255,255,.82);--toast-bg:#33302c;--toast-fg:#f6f1ea;--scrim:rgba(30,20,10,.32);
-  --shadow-card:0 1px 2px rgba(70,50,25,.05),0 5px 16px rgba(70,50,25,.07);
+  --shadow-card:0 1px 2px rgba(70,50,25,.04),0 12px 32px -16px rgba(70,50,25,.18);
   --radius:20px;--radius-sm:12px;
   --safe-bottom:env(safe-area-inset-bottom,0px);--safe-top:env(safe-area-inset-top,0px);
 }
@@ -51,7 +54,7 @@
   --danger:#f87171;--track:#3a3b42;--line:rgba(255,255,255,.08);
   --protein:#34d399;--carbs:#38bdf8;--fat:#c084fc;--fiber:#a3e635;--sugar:#f472b6;--satfat:#fb7185;--salt:#94a3b8;--data:#7cc0ff;--good:#22c55e;
   --bar-bg:rgba(20,20,24,.82);--toast-bg:#e8e3ea;--toast-fg:#26272e;--scrim:rgba(0,0,0,.6);
-  --shadow-card:0 1px 3px rgba(0,0,0,.5),0 6px 16px rgba(0,0,0,.22);
+  --shadow-card:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.5);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body,#root{height:100%;margin:0}
@@ -59,13 +62,19 @@ html,body,#root{height:100%;margin:0}
 @layer base{
   body{ @apply bg-surface text-onsurf font-sans antialiased; font-size:15px; }
   input,select,button,textarea{ font-family:inherit; }
-  h2{ margin:0; font-size:22px; font-weight:800; letter-spacing:-.01em; }
+  h2{ margin:0; font-size:24px; font-weight:800; letter-spacing:-.02em; }
 }
 @layer components{
   .app{ @apply flex flex-col h-full mx-auto; max-width:560px; }
   .content{ @apply flex-1 overflow-y-auto; -webkit-overflow-scrolling:touch; }
   .page{ @apply flex flex-col gap-4; padding:calc(var(--safe-top) + 12px) 16px 28px; }
-  .card{ @apply bg-s2 border border-line rounded-[20px] p-5; box-shadow:var(--shadow-card); }
+  .card{ @apply bg-s2 border border-line rounded-[20px] p-5; box-shadow:var(--shadow-card); transition:box-shadow .2s; }
+  .page{ animation:fadeUp .28s cubic-bezier(.2,.8,.2,1); }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(6px); } }
+  @keyframes fadeIn{ from{ opacity:0; } }
+  @keyframes pop{ from{ opacity:0; transform:translateY(10px) scale(.985); } }
+  @keyframes grow{ from{ transform:scaleX(0); } }
+  @keyframes toastIn{ from{ opacity:0; transform:translate(-50%,10px); } }
   .card-title{ @apply flex items-center gap-2 text-sm font-bold text-onsurf; margin:0 0 14px; letter-spacing:.01em; }
   .card-title .msym{ font-size:20px; color:var(--accent); }
   .chat-head{ @apply flex justify-between items-center gap-2 flex-wrap; }
@@ -149,7 +158,7 @@ html,body,#root{height:100%;margin:0}
   .warn-tag{ @apply inline-flex; color:var(--danger); }
   .warn-tag .msym{ font-size:15px; }
   .bar{ @apply rounded-full overflow-hidden; height:8px;background:var(--track); }
-  .bar-fill{ @apply rounded-full; height:100%;transition:width .45s cubic-bezier(.2,.8,.2,1); }
+  .bar-fill{ @apply rounded-full; height:100%;transition:width .45s cubic-bezier(.2,.8,.2,1);transform-origin:left center;animation:grow .7s cubic-bezier(.2,.8,.2,1); }
   .macro-top{ @apply flex gap-4 items-center flex-wrap; }
   .macro-top .bars{ flex:1;min-width:190px; }
   .energy-row{ @apply flex justify-between text-onvar; font-size:14px;padding:8px 0;border-bottom:1px solid var(--line); }
@@ -198,7 +207,7 @@ html,body,#root{height:100%;margin:0}
   .archive-wd{ @apply text-onvar; font-size:11px; } .archive-label{ font-weight:700; }
   .archive-meta{ @apply flex-1; min-width:0; }
   .archive-kcal{ font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap; }
-  .overlay{ @apply fixed inset-0 z-50 flex flex-col mx-auto; background:var(--bg);max-width:560px; }
+  .overlay{ @apply fixed inset-0 z-50 flex flex-col mx-auto; background:var(--bg);max-width:560px;animation:fadeIn .18s ease-out; }
   .overlay-head{ @apply flex items-center justify-between; padding:calc(var(--safe-top) + 12px) 16px 12px;border-bottom:1px solid var(--line); }
   .overlay-head h2{ font-size:18px;margin:0; }
   .overlay-body{ @apply flex-1 overflow-y-auto flex flex-col gap-4; padding:14px 16px calc(var(--safe-bottom) + 24px);-webkit-overflow-scrolling:touch; }
@@ -252,7 +261,22 @@ html,body,#root{height:100%;margin:0}
   .preview-meal-head{ font-size:13px;font-weight:700;color:var(--accent2);margin:6px 0 2px; }
   .preview-row{ @apply flex justify-between gap-2.5; font-size:13px;padding:3px 0; }
   .preview-name{ min-width:0; } .preview-kcal{ @apply text-onvar; white-space:nowrap; }
-  .toast{ @apply fixed left-1/2 rounded-lg font-semibold z-[80]; transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);padding:12px 16px;font-size:14px;bottom:calc(var(--safe-bottom) + 76px);box-shadow:0 8px 24px rgba(0,0,0,.28); }
+  .toast{ @apply fixed left-1/2 rounded-lg font-semibold z-[80]; transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);padding:12px 16px;font-size:14px;bottom:calc(var(--safe-bottom) + 76px);box-shadow:0 8px 24px rgba(0,0,0,.28);animation:toastIn .25s cubic-bezier(.2,.8,.2,1); }
+  .update-bar{ @apply fixed left-1/2 inline-flex items-center gap-2 rounded-full font-bold z-[85] border-0 cursor-pointer; transform:translateX(-50%);top:calc(var(--safe-top) + 12px);background:var(--accent);color:#fff;padding:10px 18px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pop .3s cubic-bezier(.2,.8,.2,1); }
+  .ring-arc{ transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1),stroke .3s; }
+  .primary:active,.chip:active,.erfassen-btn:active{ transform:scale(.98); }
+  .achart{ position:relative;width:100%;user-select:none;touch-action:pan-y; }
+  .achart-svg{ display:block;overflow:visible; }
+  .achart-grid{ stroke:var(--line);stroke-width:1; }
+  .achart-ylab{ font-size:10px;font-weight:600;fill:var(--faint);text-anchor:end;font-variant-numeric:tabular-nums; }
+  .achart-xlab{ font-size:10px;fill:var(--muted);text-anchor:middle;font-variant-numeric:tabular-nums; }
+  .achart-ref{ stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4;opacity:.9; }
+  .achart-reflab{ font-size:10px;font-weight:700;fill:var(--accent);text-anchor:end; }
+  .achart-dot{ stroke:var(--card);stroke-width:2;transition:r .15s; }
+  .achart-cursor{ stroke:var(--text);stroke-opacity:.25;stroke-width:1; }
+  .achart-tip{ position:absolute;top:0;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);border-radius:10px;padding:6px 10px;font-size:12px;pointer-events:none;white-space:nowrap;display:flex;flex-direction:column;align-items:center;gap:1px;box-shadow:0 6px 18px rgba(0,0,0,.22); }
+  .achart-tip b{ font-size:13px; } .achart-tip span{ opacity:.8; }
+  .chart-legend .sw.avg{ background:transparent;border-top:2px dashed var(--text);height:0;opacity:.6; }
   .footer-note{ @apply text-center text-onvar; font-size:12px;padding:0 12px; }
   .muted{ @apply text-onvar; } .small{ font-size:12px; } .warn{ color:var(--protein); } .over{ color:var(--danger); }
 }
@@ -294,6 +318,7 @@ html,body,#root{height:100%;margin:0}
 .arch-scroll{max-height:min(52vh,540px);overflow-y:auto;margin:0 -2px;padding:0 2px}
 .arch-scroll::-webkit-scrollbar{width:8px}.arch-scroll::-webkit-scrollbar-thumb{background:var(--card2);border-radius:8px}
 @media (hover:none){ .entry-actions{opacity:1!important} }
+@media (prefers-reduced-motion:reduce){ .page,.overlay,.toast,.update-bar,.bar-fill{animation:none!important} .ring-arc,.bar-fill{transition:none!important} }
 @media (hover:hover){
   .chip:hover,.preset:hover,.nav-btn:hover,.metric-chip:hover,.seg button:hover{filter:brightness(.98)}
   :root[data-theme="dark"] .chip:hover,:root[data-theme="dark"] .preset:hover,:root[data-theme="dark"] .nav-btn:hover,:root[data-theme="dark"] .metric-chip:hover,:root[data-theme="dark"] .seg button:hover{filter:brightness(1.12)}
@@ -709,13 +734,14 @@ function copyDay(setState,from,to){
 /* ---------- UI-Bausteine ---------- */
 function Ring({consumed,budget}){
   const size=200,stroke=18,r=(size-stroke)/2,c=2*Math.PI*r;
-  const frac=budget>0?Math.min(consumed/budget,1):0, over=consumed>budget, rem=budget-consumed;
+  const target=budget>0?Math.min(consumed/budget,1):0, over=consumed>budget, rem=budget-consumed;
+  const [frac,setFrac]=useState(0); useEffect(()=>{const t=requestAnimationFrame(()=>setFrac(target));return ()=>cancelAnimationFrame(t);},[target]);
   return (
     <div className="ring-wrap">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--track)" strokeWidth={stroke}/>
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={over?'var(--danger)':'var(--accent)'} strokeWidth={stroke}
-          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c*(1-frac)} transform={`rotate(-90 ${size/2} ${size/2})`}/>
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c*(1-frac)} transform={`rotate(-90 ${size/2} ${size/2})`} className="ring-arc"/>
       </svg>
       <div className="ring-center">
         <div className={'ring-value'+(over?' over':'')}>{Math.abs(rem)}</div>
@@ -770,6 +796,43 @@ const DayBars=({data,unit='',color='var(--data)',refLabel='Budget'})=>{
     </div>
   </div>);
 };
+/* Weiches Flächendiagramm mit Hover-Werten (Zeitverlauf). Lücken = nicht erfasste Tage. */
+function smoothPath(seg,yMin,yMax){
+  if(seg.length===1)return `M${seg[0].x},${seg[0].y}`;
+  const cl=v=>Math.max(yMin,Math.min(yMax,v)); let d=`M${seg[0].x},${seg[0].y}`;
+  for(let i=0;i<seg.length-1;i++){const p0=seg[i-1]||seg[i],p1=seg[i],p2=seg[i+1],p3=seg[i+2]||p2;
+    d+=` C${p1.x+(p2.x-p0.x)/6},${cl(p1.y+(p2.y-p0.y)/6)} ${p2.x-(p3.x-p1.x)/6},${cl(p2.y-(p3.y-p1.y)/6)} ${p2.x},${p2.y}`;}
+  return d;
+}
+function AreaChart({data,unit='',color='var(--data)',refLabel='Budget',height=210}){
+  const wrap=useRef(null); const [w,setW]=useState(600); const [hi,setHi]=useState(null);
+  useEffect(()=>{const el=wrap.current;if(!el)return;const m=()=>setW(el.clientWidth||600);m();if(window.ResizeObserver){const ro=new ResizeObserver(m);ro.observe(el);return ()=>ro.disconnect();}window.addEventListener('resize',m);return ()=>window.removeEventListener('resize',m);},[]);
+  const padL=36,padR=12,padT=16,padB=26, iw=Math.max(10,w-padL-padR), ih=height-padT-padB;
+  const refVal=(data.find(d=>d.ref!=null)||{}).ref;
+  const rawMax=Math.max(...data.map(d=>Math.max(d.value||0,d.ref||0)),1); const max=niceMax(rawMax*1.08);
+  const n=data.length; const X=i=>padL+(n>1?i/(n-1)*iw:iw/2); const Y=v=>padT+ih-(v/max)*ih;
+  const pts=data.map((d,i)=>d.value==null?null:{x:X(i),y:Y(d.value),d,i});
+  const segs=[]; let cur=[]; pts.forEach(p=>{if(p)cur.push(p);else{if(cur.length)segs.push(cur);cur=[];}}); if(cur.length)segs.push(cur);
+  const avgPts=n>=14?data.map((d,i)=>{const win=data.slice(Math.max(0,i-6),i+1).map(v=>v.value).filter(v=>v!=null);return win.length>=3?{x:X(i),y:Y(avgF(win))}:null;}).filter(Boolean):[];
+  const step=n<=14?1:Math.ceil(n/8);
+  const gid=useMemo(()=>'ag'+Math.random().toString(36).slice(2,7),[]);
+  const onMove=e=>{const r=wrap.current.getBoundingClientRect();const mx=e.clientX-r.left-padL;let i=Math.round(mx/iw*(n-1));i=Math.max(0,Math.min(n-1,i));setHi(i);};
+  const hp=hi!=null?pts[hi]:null; const hd=hi!=null?data[hi]:null;
+  const tipLeft=hp?Math.min(Math.max(hp.x,70),w-70):0;
+  return (<div className="achart" ref={wrap} onMouseMove={onMove} onMouseLeave={()=>setHi(null)} onTouchStart={e=>onMove(e.touches[0])} onTouchMove={e=>onMove(e.touches[0])}>
+    <svg width={w} height={height} className="achart-svg">
+      <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".28"/><stop offset="1" stopColor={color} stopOpacity=".02"/></linearGradient></defs>
+      {[0,.25,.5,.75,1].map(f=>(<g key={f}><line x1={padL} x2={w-padR} y1={Y(max*f)} y2={Y(max*f)} className="achart-grid"/><text x={padL-6} y={Y(max*f)+3} className="achart-ylab">{fmtK(max*f)}</text></g>))}
+      {segs.map((sg,k)=>(<g key={k}><path d={smoothPath(sg,padT,padT+ih)+` L${sg[sg.length-1].x},${Y(0)} L${sg[0].x},${Y(0)} Z`} fill={`url(#${gid})`}/><path d={smoothPath(sg,padT,padT+ih)} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" className="achart-line"/></g>))}
+      {avgPts.length>1&&<path d={smoothPath(avgPts,padT,padT+ih)} fill="none" stroke="var(--text)" strokeOpacity=".45" strokeWidth="1.5" strokeDasharray="3 4"/>}
+      {refVal!=null&&<g><line x1={padL} x2={w-padR} y1={Y(refVal)} y2={Y(refVal)} className="achart-ref"/><text x={w-padR} y={Y(refVal)-5} className="achart-reflab">{refLabel} {Math.round(refVal)}</text></g>}
+      {pts.map(p=>p&&<circle key={p.i} cx={p.x} cy={p.y} r={hi===p.i?5:3} className={'achart-dot'+(p.d.over?' over':'')} style={{fill:p.d.over?'var(--danger)':color}}/>)}
+      {hp&&<line x1={hp.x} x2={hp.x} y1={padT} y2={padT+ih} className="achart-cursor"/>}
+      {data.map((d,i)=>i%step===0&&<text key={d.key} x={X(i)} y={height-6} className="achart-xlab">{d.label!=null?d.label:d.key.slice(8)}</text>)}
+    </svg>
+    {hd&&<div className="achart-tip" style={{left:tipLeft}}><b>{hd.value!=null?Math.round(hd.value*10)/10+unit:'nicht erfasst'}</b><span>{hd.title||dateLabel(hd.key)}{hd.ref!=null&&hd.value!=null?' · '+(hd.value>hd.ref?'+':'')+Math.round(hd.value-hd.ref)+unit+' zum Ziel':''}</span></div>}
+  </div>);
+}
 function Heatmap({days,goal,onPick,weeks=9}){
   const today=todayKey();
   const startMon=getMonday(addDays(today,-7*(weeks-1)));
@@ -1416,8 +1479,8 @@ function Stats({state,setState,setDate,goToToday,cloud,notify}){
           {tracked.length>0 && <div className="kpi"><span className="kpi-big" style={{color:METRIC_COLOR[metric]}}>{metric==='calories'?Math.round(mAvg):mAvg}</span><span className="kpi-unit">{mInfo.unit.trim()} Ø</span>{present.length>=4 && <span className={'trend '+(trend>0?'up':trend<0?'down':'flat')}>{trend>0?<><Icon name="trending_up"/> steigend</>:trend<0?<><Icon name="trending_down"/> fallend</>:<><Icon name="trending_flat"/> stabil</>}</span>}</div>}
         </div>
         <div className="metric-chips">{METRICS.map(m=>(<button key={m.id} className={'metric-chip'+(metric===m.id?' on':'')} onClick={()=>setMetric(m.id)}>{m.label}</button>))}</div>
-        <DayBars data={chartData} unit={mInfo.unit} color={METRIC_COLOR[metric]}/>
-        <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> Ziel/Budget</span><span><i className="sw danger"/> über Ziel</span></div>
+        <AreaChart data={chartData.map((d,i)=>({...d,value:rows[i].has?d.value:null}))} unit={mInfo.unit} color={METRIC_COLOR[metric]}/>
+        <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> Ziel/Budget</span><span><i className="sw danger"/> über Ziel</span>{range>=14&&<span><i className="sw avg"/> 7-Tage-Schnitt</span>}</div>
       </section>
 
       <section className="card">
@@ -1763,6 +1826,8 @@ function App(){
   const [importOpen,setImportOpen]=useState(null); // null | 'auto' | 'ai' | 'table'
   const [helpOpen,setHelpOpen]=useState(false);
   const [manualSignal,setManualSignal]=useState(0);
+  const [updateReg,setUpdateReg]=useState(null);
+  useEffect(()=>{const on=e=>setUpdateReg(e.detail);window.addEventListener('essen:update',on);return ()=>window.removeEventListener('essen:update',on);},[]);
   const [toast,setToast]=useState(null);
   useEffect(()=>{save(state);},[state]);
   const toastT=useRef(null);
@@ -1850,11 +1915,21 @@ function App(){
       </nav>
       {importOpen && <ImportPanel state={state} setState={setState} setDate={setDate} onClose={()=>setImportOpen(null)} cloud={cloud} date={date} notify={notify} initialMode={importOpen}/>}
       {helpOpen && <HelpOverlay onClose={()=>setHelpOpen(false)}/>}
+      {updateReg && <button className="update-bar" onClick={()=>{try{updateReg.waiting&&updateReg.waiting.postMessage('skipWaiting');}catch(e){}setUpdateReg(null);}}><Icon name="system_update_alt"/> Neue Version verfügbar – jetzt laden</button>}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+/* Installierbar & offline: Service Worker nur über http(s), nicht bei Doppelklick auf die Datei. */
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      reg.addEventListener('updatefound',()=>{const nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)window.dispatchEvent(new CustomEvent('essen:update',{detail:reg}));});});
+    }).catch(()=>{});
+    let reloading=false; navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
+  });
+}
 </script>
 </body>
 </html>
