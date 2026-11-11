@@ -2,9 +2,11 @@
 
 Eingerichtet als geplanter Task „Garmin- & Hevy-Sync → Essen-App (2× täglich)“,
 08:20 und 22:20 Uhr (Europe/Vienna), mit den Connectoren Garmin („Missing MCP“)
-und Hevy. Der Task schreibt Garmin-Tagesdaten nach `garmin_days` und
-Hevy-Workouts nach `hevy_sync_workouts` (gleiche JSON-Form wie die Edge
-Function `hevy`). Die vollständige Task-Anweisung steht im Task selbst; dieses
+und Hevy. Der Task schreibt Garmin-Tagesdaten (heute + 3 Vortage, Aktivitäten der
+letzten 14 Tage) nach `garmin_days` und Hevy-Workouts der letzten 7 Tage nach
+`hevy_sync_workouts` (gleiche JSON-Form wie die Edge Function `hevy`; ältere
+Workouts bleiben in der Tabelle). Das 7-Tage-Fenster hält den Lauf kurz: Der
+Großteil der Kosten eines Laufs ist das Übertragen der Workout-Details. Die vollständige Task-Anweisung steht im Task selbst; dieses
 Dokument beschreibt Ablauf und Datenformat.
 
 Garmin bietet keine offizielle API für Endnutzer, und der Login der inoffiziellen
