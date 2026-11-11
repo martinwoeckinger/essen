@@ -84,6 +84,13 @@ Row-Level-Security.
 Alternativ lässt sich der Key in der App unter **Profil → Cloud & KI**
 einmalig eintragen (wird nur in diesem Browser gespeichert).
 
+## Garmin
+
+Tabelle `garmin_days` aus [`garmin.sql`](garmin.sql) anlegen. Befüllt wird sie
+nicht von der App, sondern von einem Garmin-Sync (geplanter Claude-Task mit
+Garmin-Connector), Details und Datenformat in [`garmin-sync.md`](garmin-sync.md).
+Die App liest nur die eigenen Zeilen.
+
 ## Wie die App synchronisiert
 
 - `localStorage` bleibt Offline-Cache. Nach dem Login wird der Cloud-Stand
