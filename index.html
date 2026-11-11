@@ -9,6 +9,9 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Essen" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon-180.png" />
 <title>Essen – Kalorientracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
@@ -36,7 +39,7 @@
   --danger:#c0341d;--track:#e6dfd5;--line:rgba(0,0,0,.09);
   --protein:#059669;--carbs:#0284c7;--fat:#9333ea;--fiber:#65a30d;--sugar:#db2777;--satfat:#e11d48;--salt:#64748b;--data:#2563eb;--good:#16a34a;
   --bar-bg:rgba(255,255,255,.82);--toast-bg:#33302c;--toast-fg:#f6f1ea;--scrim:rgba(30,20,10,.32);
-  --shadow-card:0 1px 2px rgba(70,50,25,.05),0 5px 16px rgba(70,50,25,.07);
+  --shadow-card:0 1px 2px rgba(70,50,25,.04),0 12px 32px -16px rgba(70,50,25,.18);
   --radius:20px;--radius-sm:12px;
   --safe-bottom:env(safe-area-inset-bottom,0px);--safe-top:env(safe-area-inset-top,0px);
 }
@@ -51,7 +54,7 @@
   --danger:#f87171;--track:#3a3b42;--line:rgba(255,255,255,.08);
   --protein:#34d399;--carbs:#38bdf8;--fat:#c084fc;--fiber:#a3e635;--sugar:#f472b6;--satfat:#fb7185;--salt:#94a3b8;--data:#7cc0ff;--good:#22c55e;
   --bar-bg:rgba(20,20,24,.82);--toast-bg:#e8e3ea;--toast-fg:#26272e;--scrim:rgba(0,0,0,.6);
-  --shadow-card:0 1px 3px rgba(0,0,0,.5),0 6px 16px rgba(0,0,0,.22);
+  --shadow-card:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.5);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body,#root{height:100%;margin:0}
@@ -59,13 +62,19 @@ html,body,#root{height:100%;margin:0}
 @layer base{
   body{ @apply bg-surface text-onsurf font-sans antialiased; font-size:15px; }
   input,select,button,textarea{ font-family:inherit; }
-  h2{ margin:0; font-size:22px; font-weight:800; letter-spacing:-.01em; }
+  h2{ margin:0; font-size:24px; font-weight:800; letter-spacing:-.02em; }
 }
 @layer components{
   .app{ @apply flex flex-col h-full mx-auto; max-width:560px; }
   .content{ @apply flex-1 overflow-y-auto; -webkit-overflow-scrolling:touch; }
   .page{ @apply flex flex-col gap-4; padding:calc(var(--safe-top) + 12px) 16px 28px; }
-  .card{ @apply bg-s2 border border-line rounded-[20px] p-5; box-shadow:var(--shadow-card); }
+  .card{ @apply bg-s2 border border-line rounded-[20px] p-5; box-shadow:var(--shadow-card); transition:box-shadow .2s; }
+  .page{ animation:fadeUp .28s cubic-bezier(.2,.8,.2,1); }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(6px); } }
+  @keyframes fadeIn{ from{ opacity:0; } }
+  @keyframes pop{ from{ opacity:0; transform:translateY(10px) scale(.985); } }
+  @keyframes grow{ from{ transform:scaleX(0); } }
+  @keyframes toastIn{ from{ opacity:0; transform:translate(-50%,10px); } }
   .card-title{ @apply flex items-center gap-2 text-sm font-bold text-onsurf; margin:0 0 14px; letter-spacing:.01em; }
   .card-title .msym{ font-size:20px; color:var(--accent); }
   .chat-head{ @apply flex justify-between items-center gap-2 flex-wrap; }
@@ -149,7 +158,7 @@ html,body,#root{height:100%;margin:0}
   .warn-tag{ @apply inline-flex; color:var(--danger); }
   .warn-tag .msym{ font-size:15px; }
   .bar{ @apply rounded-full overflow-hidden; height:8px;background:var(--track); }
-  .bar-fill{ @apply rounded-full; height:100%;transition:width .45s cubic-bezier(.2,.8,.2,1); }
+  .bar-fill{ @apply rounded-full; height:100%;transition:width .45s cubic-bezier(.2,.8,.2,1);transform-origin:left center;animation:grow .7s cubic-bezier(.2,.8,.2,1); }
   .macro-top{ @apply flex gap-4 items-center flex-wrap; }
   .macro-top .bars{ flex:1;min-width:190px; }
   .energy-row{ @apply flex justify-between text-onvar; font-size:14px;padding:8px 0;border-bottom:1px solid var(--line); }
@@ -198,7 +207,7 @@ html,body,#root{height:100%;margin:0}
   .archive-wd{ @apply text-onvar; font-size:11px; } .archive-label{ font-weight:700; }
   .archive-meta{ @apply flex-1; min-width:0; }
   .archive-kcal{ font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap; }
-  .overlay{ @apply fixed inset-0 z-50 flex flex-col mx-auto; background:var(--bg);max-width:560px; }
+  .overlay{ @apply fixed inset-0 z-50 flex flex-col mx-auto; background:var(--bg);max-width:560px;animation:fadeIn .18s ease-out; }
   .overlay-head{ @apply flex items-center justify-between; padding:calc(var(--safe-top) + 12px) 16px 12px;border-bottom:1px solid var(--line); }
   .overlay-head h2{ font-size:18px;margin:0; }
   .overlay-body{ @apply flex-1 overflow-y-auto flex flex-col gap-4; padding:14px 16px calc(var(--safe-bottom) + 24px);-webkit-overflow-scrolling:touch; }
@@ -228,11 +237,51 @@ html,body,#root{height:100%;margin:0}
   kbd{ @apply inline-block bg-s3 border border-line rounded-md text-onsurf; font-family:inherit;font-size:12px;font-weight:700;padding:2px 7px; }
   .side-stat{ display:none; }
   .wide-only{ display:none; }
+  .tl{ margin:4px 0 14px; }
+  .tl-track{ position:relative;height:26px;border-radius:13px;background:var(--track); }
+  .tl-window{ position:absolute;top:0;bottom:0;background:var(--accent-soft);border-radius:13px; }
+  .tl-dot{ position:absolute;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--card); }
+  .tl-axis{ position:relative;height:14px;margin-top:4px;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums; }
+  .tl-axis span{ position:absolute;transform:translateX(-50%); }
+  .tl-axis span:first-child{ transform:none; } .tl-axis span:last-child{ transform:translateX(-100%); }
+  .tl-stats{ @apply grid gap-2; grid-template-columns:repeat(4,1fr); }
+  .tl-stats div{ @apply flex flex-col items-center text-center; }
+  .tl-stats b{ font-size:15px;font-weight:800;font-variant-numeric:tabular-nums; }
+  .tl-stats span{ @apply text-onvar; font-size:11px; }
+  .tbl{ width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums; }
+  .tbl th{ @apply text-onvar; text-align:right;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:4px 6px;border-bottom:1px solid var(--line); }
+  .tbl th:first-child,.tbl td:first-child{ text-align:left;padding-left:0; }
+  .tbl td{ padding:8px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap; }
+  .tbl tr:last-child td{ border-bottom:none; } .tbl tr.muted td{ color:var(--faint); }
+  .wd-grid{ @apply grid gap-1; grid-template-columns:repeat(7,1fr);margin-top:10px;text-align:center; }
+  .wd-grid div{ @apply flex flex-col; font-size:11px;color:var(--muted);padding:6px 2px;border-radius:8px; } .wd-grid b{ font-size:12px;color:var(--text); } .wd-grid div.over{ background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger); }
+  .top-row{ @apply flex justify-between gap-3; font-size:13px;padding:6px 0;border-bottom:1px solid var(--line); } .top-row:last-child{ border-bottom:none; }
+  .report{ font-size:14px;line-height:1.55; } .report p{ margin:0 0 8px; } .report li{ margin:0 0 6px 18px; }
+  .ex-icon{ font-size:18px;color:var(--accent);vertical-align:-3px; }
+  .hevy-row{ @apply flex items-start gap-3 cursor-pointer; padding:10px 0;border-top:1px solid var(--line); } .hevy-row:first-of-type{ border-top:none; }
+  .hevy-row input{ width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none; }
+  .hevy-main{ @apply flex flex-col gap-0.5; min-width:0;flex:1; } .hevy-title{ font-weight:700; }
+  .hevy-row.done{ opacity:.55; } .hevy-tag{ @apply bg-s3 text-onvar rounded-full; font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap; }
   .preview-meal{ margin-top:8px; }
   .preview-meal-head{ font-size:13px;font-weight:700;color:var(--accent2);margin:6px 0 2px; }
   .preview-row{ @apply flex justify-between gap-2.5; font-size:13px;padding:3px 0; }
   .preview-name{ min-width:0; } .preview-kcal{ @apply text-onvar; white-space:nowrap; }
-  .toast{ @apply fixed left-1/2 rounded-lg font-semibold z-[80]; transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);padding:12px 16px;font-size:14px;bottom:calc(var(--safe-bottom) + 76px);box-shadow:0 8px 24px rgba(0,0,0,.28); }
+  .toast{ @apply fixed left-1/2 rounded-lg font-semibold z-[80]; transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);padding:12px 16px;font-size:14px;bottom:calc(var(--safe-bottom) + 76px);box-shadow:0 8px 24px rgba(0,0,0,.28);animation:toastIn .25s cubic-bezier(.2,.8,.2,1); }
+  .update-bar{ @apply fixed left-1/2 inline-flex items-center gap-2 rounded-full font-bold z-[85] border-0 cursor-pointer; transform:translateX(-50%);top:calc(var(--safe-top) + 12px);background:var(--accent);color:#fff;padding:10px 18px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pop .3s cubic-bezier(.2,.8,.2,1); }
+  .ring-arc{ transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1),stroke .3s; }
+  .primary:active,.chip:active,.erfassen-btn:active{ transform:scale(.98); }
+  .achart{ position:relative;width:100%;user-select:none;touch-action:pan-y; }
+  .achart-svg{ display:block;overflow:visible; }
+  .achart-grid{ stroke:var(--line);stroke-width:1; }
+  .achart-ylab{ font-size:10px;font-weight:600;fill:var(--faint);text-anchor:end;font-variant-numeric:tabular-nums; }
+  .achart-xlab{ font-size:10px;fill:var(--muted);text-anchor:middle;font-variant-numeric:tabular-nums; }
+  .achart-ref{ stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4;opacity:.9; }
+  .achart-reflab{ font-size:10px;font-weight:700;fill:var(--accent);text-anchor:end; }
+  .achart-dot{ stroke:var(--card);stroke-width:2;transition:r .15s; }
+  .achart-cursor{ stroke:var(--text);stroke-opacity:.25;stroke-width:1; }
+  .achart-tip{ position:absolute;top:0;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-fg);border-radius:10px;padding:6px 10px;font-size:12px;pointer-events:none;white-space:nowrap;display:flex;flex-direction:column;align-items:center;gap:1px;box-shadow:0 6px 18px rgba(0,0,0,.22); }
+  .achart-tip b{ font-size:13px; } .achart-tip span{ opacity:.8; }
+  .chart-legend .sw.avg{ background:transparent;border-top:2px dashed var(--text);height:0;opacity:.6; }
   .footer-note{ @apply text-center text-onvar; font-size:12px;padding:0 12px; }
   .muted{ @apply text-onvar; } .small{ font-size:12px; } .warn{ color:var(--protein); } .over{ color:var(--danger); }
 }
@@ -274,6 +323,7 @@ html,body,#root{height:100%;margin:0}
 .arch-scroll{max-height:min(52vh,540px);overflow-y:auto;margin:0 -2px;padding:0 2px}
 .arch-scroll::-webkit-scrollbar{width:8px}.arch-scroll::-webkit-scrollbar-thumb{background:var(--card2);border-radius:8px}
 @media (hover:none){ .entry-actions{opacity:1!important} }
+@media (prefers-reduced-motion:reduce){ .page,.overlay,.toast,.update-bar,.bar-fill{animation:none!important} .ring-arc,.bar-fill{transition:none!important} }
 @media (hover:hover){
   .chip:hover,.preset:hover,.nav-btn:hover,.metric-chip:hover,.seg button:hover{filter:brightness(.98)}
   :root[data-theme="dark"] .chip:hover,:root[data-theme="dark"] .preset:hover,:root[data-theme="dark"] .nav-btn:hover,:root[data-theme="dark"] .metric-chip:hover,:root[data-theme="dark"] .seg button:hover{filter:brightness(1.12)}
@@ -370,6 +420,13 @@ const MEALS={
   snack:{label:'Snack',icon:'cookie',hour:16,order:3},
 };
 const MEAL_ORDER=Object.keys(MEALS).sort((a,b)=>MEALS[a].order-MEALS[b].order);
+/* ---------- Training ---------- */
+const EX_TYPES={strength:{label:'Kraft',icon:'fitness_center'},cardio:{label:'Ausdauer',icon:'directions_run'},mobility:{label:'Mobility',icon:'self_improvement'},other:{label:'Sonstiges',icon:'sports'}};
+const EX_INT={low:'leicht',mid:'mittel',high:'hart'};
+const exType = e => EX_TYPES[e&&e.type]?e.type:'other';
+const countsAsTraining = e => exType(e)!=='mobility';
+/* Grobe kcal-Schätzung über MET (Kraft 5, Ausdauer 8, Mobility 2.5) × kg × Stunden. */
+const estimateKcal=(type,durationMin,weight)=>{const met={strength:5,cardio:8,mobility:2.5,other:5}[type]||5;return Math.round(met*(+weight||75)*((+durationMin||0)/60));};
 const defaultMeal=()=>{const h=new Date().getHours();return h<11?'breakfast':h<15?'lunch':h<18?'snack':'dinner';};
 
 /* ---------- Berechnung ---------- */
@@ -403,6 +460,27 @@ const isoAt = (k,h,min=0)=>{const[y,m,d]=k.split('-').map(Number);return new Dat
 const timeLabel = iso=>{if(!iso)return'';const d=new Date(iso);if(isNaN(d.getTime()))return'';try{return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
 const getMonday = k=>{const[y,m,d]=k.split('-').map(Number);const dow=(new Date(y,m-1,d).getDay()+6)%7;return addDays(k,-dow);};
 const uid = ()=> (crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
+
+/* ---------- Uhrzeiten ---------- */
+/* Echte Essenszeit: explizit gesetzt (timeSet) oder von Hand erfasst; Import-Einträge ohne Uhrzeit haben nur eine Kunstzeit. */
+const hasRealTime = f => !!(f&&f.time&&(f.timeSet||(f.source&&f.source!=='import')));
+const hourOf = iso=>{const d=new Date(iso);return d.getHours()+d.getMinutes()/60;};
+const parseHM = s=>{const m=String(s||'').trim().match(/^(\d{1,2})[:.](\d{2})$/);if(!m)return null;const h=+m[1],mi=+m[2];return (h<24&&mi<60)?{h,m:mi}:null;};
+const hmStr = (h,m)=>pad2(h)+':'+pad2(m);
+const nowHM = ()=>{const d=new Date();return hmStr(d.getHours(),d.getMinutes());};
+const defaultHM = (date,meal)=> date===todayKey()?nowHM():hmStr((MEALS[meal]||MEALS.snack).hour,0);
+const isoFromHM = (date,hm)=>{const t=parseHM(hm);return t?isoAt(date,t.h,t.m):null;};
+const fmtDur = h=>{const t=Math.max(0,Math.round(h*60));return Math.floor(t/60)+' h '+pad2(t%60);};
+const fmtClock = h=>{const t=Math.round(h*60);return pad2(Math.floor(t/60)%24)+':'+pad2(t%60);};
+function dayTimes(day){return ((day&&day.foods)||[]).filter(hasRealTime).map(f=>({h:hourOf(f.time),kcal:+f.calories||0,name:f.name,meal:f.meal})).sort((a,b)=>a.h-b.h);}
+function eatingStats(day){
+  const ts=dayTimes(day); if(!ts.length)return null;
+  const first=ts[0].h,last=ts[ts.length-1].h; const total=ts.reduce((a,t)=>a+t.kcal,0)||1;
+  const late=ts.filter(t=>t.h>=20).reduce((a,t)=>a+t.kcal,0);
+  const gaps=[]; for(let i=1;i<ts.length;i++){const g=ts[i].h-ts[i-1].h;if(g>=0.5)gaps.push(g);}
+  return {first,last,window:last-first,count:ts.length,lateShare:late/total,gaps,ts,total};
+}
+function fastingBefore(days,k){const prev=eatingStats(days[addDays(k,-1)]),cur=eatingStats(days[k]);if(!prev||!cur)return null;return (24-prev.last)+cur.first;}
 
 /* ---------- Strukturierter Import ---------- */
 const MEAL_ALIASES={'frühstück':'breakfast',fruehstueck:'breakfast',fruhstuck:'breakfast',breakfast:'breakfast',morgens:'breakfast',mittagessen:'lunch',mittag:'lunch',lunch:'lunch',abendessen:'dinner',abendbrot:'dinner',abend:'dinner',dinner:'dinner',snack:'snack',snacks:'snack',zwischenmahlzeit:'snack',zwischendurch:'snack',zwischen:'snack',imbiss:'snack'};
@@ -440,8 +518,8 @@ function parseStructured(input){
     if(cells.length<5){errors.push({line:lineNo,text:trimmed,reason:'Zu wenige Spalten (mind. Datum, Mahlzeit, Name, Menge, kcal – Tab-getrennt).'});return;}
     const date=parseDate(cells[0]); if(!date){errors.push({line:lineNo,text:trimmed,reason:'Datum "'+cells[0]+'" nicht erkannt.'});return;}
     const name=(cells[2]||'').trim(); if(!name){errors.push({line:lineNo,text:trimmed,reason:'Kein Nahrungsmittel-Name.'});return;}
-    const note=(cells[12]||'').trim();
-    rows.push({date,meal:parseMeal(cells[1]),mealLabel:(cells[1]||'').trim()||MEALS[parseMeal(cells[1])].label,name,quantity:(cells[3]||'').trim()||undefined,calories:parseNumber(cells[4]),protein:parseNumber(cells[5]),carbs:parseNumber(cells[6]),sugar:parseNumber(cells[7]),fat:parseNumber(cells[8]),saturatedFat:parseNumber(cells[9]),fiber:parseNumber(cells[10]),salt:parseNumber(cells[11]),note:note||undefined});
+    const note=(cells[12]||'').trim(); const tm=parseHM(cells[13]);
+    rows.push({date,meal:parseMeal(cells[1]),mealLabel:(cells[1]||'').trim()||MEALS[parseMeal(cells[1])].label,name,quantity:(cells[3]||'').trim()||undefined,calories:parseNumber(cells[4]),protein:parseNumber(cells[5]),carbs:parseNumber(cells[6]),sugar:parseNumber(cells[7]),fat:parseNumber(cells[8]),saturatedFat:parseNumber(cells[9]),fiber:parseNumber(cells[10]),salt:parseNumber(cells[11]),note:note||undefined,time:tm?hmStr(tm.h,tm.m):undefined});
   });
   return {rows,errors};
 }
@@ -449,12 +527,12 @@ function sumParsed(rows){const t={calories:0,protein:0,carbs:0,sugar:0,fat:0,sat
 const deNum = n => String(Math.round(n*100)/100).replace('.',',');
 const deDate = k => {const[y,m,d]=k.split('-');return d+'.'+m+'.'+y;};
 function serializeEntries(entries){
-  return entries.map(({date,entry:e})=>[deDate(date),MEALS[e.meal].label,e.name,e.quantity||'',deNum(e.calories),deNum(e.protein),deNum(e.carbs),deNum(e.sugar),deNum(e.fat),deNum(e.saturatedFat),deNum(e.fiber),deNum(e.salt),e.note||''].join('\t')).join('\n');
+  return entries.map(({date,entry:e})=>[deDate(date),MEALS[e.meal].label,e.name,e.quantity||'',deNum(e.calories),deNum(e.protein),deNum(e.carbs),deNum(e.sugar),deNum(e.fat),deNum(e.saturatedFat),deNum(e.fiber),deNum(e.salt),e.note||'',hasRealTime(e)?timeLabel(e.time):''].join('\t')).join('\n');
 }
 const IMPORT_EXAMPLE=[
-  '02.06.2026\tFrühstück\tNaturjoghurt\t400 g\t260\t14\t19\t19\t14\t9\t0\t0,4\tVollmilchjoghurt 3,5%',
-  '02.06.2026\tFrühstück\tHimbeeren\t100 g\t52\t1\t12\t4\t1\t0\t7\t0\tfrisch',
-  '02.06.2026\tFrühstück\tBrombeeren\t100 g\t43\t1\t10\t5\t0\t0\t5\t0\tfrisch',
+  '02.06.2026\tFrühstück\tNaturjoghurt\t400 g\t260\t14\t19\t19\t14\t9\t0\t0,4\tVollmilchjoghurt 3,5%\t07:40',
+  '02.06.2026\tFrühstück\tHimbeeren\t100 g\t52\t1\t12\t4\t1\t0\t7\t0\tfrisch\t07:40',
+  '02.06.2026\tFrühstück\tBrombeeren\t100 g\t43\t1\t10\t5\t0\t0\t5\t0\tfrisch\t07:40',
   '02.06.2026\tSnack\tProteinriegel\t1 Stk (~50 g)\t200\t20\t18\t3\t7\t4\t2\t0,3\ttyp. Riegel ~50 g',
   '02.06.2026\tMittagessen\tChicken-Panade-Salat\t1 Portion\t550\t35\t30\t5\t30\t6\t5\t1,5\tRestaurantportion',
   '02.06.2026\tSnack\tCottage Cheese\t1 Becher (~200 g)\t200\t24\t7\t7\t9\t6\t0\t1,8\t~4% Fett',
@@ -465,7 +543,7 @@ const IMPORT_EXAMPLE=[
 const DEFAULTS = {
   profile:{name:'',sex:'male',age:30,height:180,weight:80,targetWeight:null},
   goal:{kcalTraining:2500,kcalRest:2000,proteinTraining:150,carbsTraining:280,fatTraining:80,proteinRest:150,carbsRest:180,fatRest:75,fiberGoal:30,sugarLimit:50,saltLimit:6,satFatLimit:20,preferences:''},
-  days:{},favorites:[],ui:{theme:'light',collapsedMeals:{}},meta:{updatedAt:''},
+  days:{},favorites:[],reports:{},ui:{theme:'light',collapsedMeals:{}},meta:{updatedAt:''},
 };
 function migrateDays(days){
   const out={};
@@ -495,6 +573,7 @@ function normalizeState(p){
     goal:migrateGoal(p.goal),
     days:migrateDays(p.days),
     favorites:Array.isArray(p.favorites)?p.favorites:[],
+    reports:(p.reports&&typeof p.reports==='object')?p.reports:{},
     ui:{...DEFAULTS.ui,...(p.ui||{})},
     meta:{updatedAt:(p.meta&&p.meta.updatedAt)||''},
   };
@@ -517,8 +596,8 @@ function sb(){
   try{_sb=window.supabase.createClient(c.url,c.anonKey);}catch(e){console.error(e);return null;}
   return _sb;
 }
-const SYNC_KEYS=['profile','goal','days','favorites'];
-const syncable = s => ({profile:s.profile,goal:s.goal,days:s.days,favorites:s.favorites});
+const SYNC_KEYS=['profile','goal','days','favorites','reports'];
+const syncable = s => ({profile:s.profile,goal:s.goal,days:s.days,favorites:s.favorites,reports:s.reports||{}});
 const hasData = s => Object.keys(s.days||{}).length>0 || (s.favorites||[]).length>0;
 const ts = v => { const n=Date.parse(v||''); return isFinite(n)?n:0; };
 async function cloudPull(userId){
@@ -543,6 +622,18 @@ async function cloudNutrition(payload){
     try{const ctx=error.context;if(ctx&&typeof ctx.json==='function'){const j=await ctx.json();if(j&&j.error)msg=j.error;}}catch(e){}
     throw new Error(msg);
   }
+  if(data&&data.error)throw new Error(data.error);
+  return data||{};
+}
+async function cloudReport(payload){
+  const {data,error}=await sb().functions.invoke('report',{body:payload});
+  if(error){let msg=error.message||'Fehler beim Wochenbericht';try{const ctx=error.context;if(ctx&&typeof ctx.json==='function'){const j=await ctx.json();if(j&&j.error)msg=j.error;}}catch(e){}throw new Error(msg);}
+  if(data&&data.error)throw new Error(data.error);
+  return data||{};
+}
+async function cloudHevy(since){
+  const {data,error}=await sb().functions.invoke('hevy',{body:{since}});
+  if(error){let msg=error.message||'Fehler beim Hevy-Import';try{const ctx=error.context;if(ctx&&typeof ctx.json==='function'){const j=await ctx.json();if(j&&j.error)msg=j.error;}}catch(e){}throw new Error(msg);}
   if(data&&data.error)throw new Error(data.error);
   return data||{};
 }
@@ -634,12 +725,17 @@ function DayTypeSeg({state,setState,date}){
   </div>);
 }
 function addExTo(setState,date,ex){
-  setState(s=>{const d=s.days[date]||{date,foods:[],exercises:[]};return{...s,days:{...s.days,[date]:{...d,exercises:[...d.exercises,{...ex,id:uid(),time:new Date().toISOString()}]}}};});
+  setState(s=>{const d=s.days[date]||{date,foods:[],exercises:[]};const entry={...ex,id:uid(),time:ex.time||new Date().toISOString()};return{...s,days:{...s.days,[date]:{...d,training:d.training||countsAsTraining(entry),exercises:[...d.exercises,entry]}}};});
 }
+function updateEx(setState,date,id,patch){
+  setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,exercises:d.exercises.map(e=>e.id===id?{...e,...patch}:e)}}};});
+}
+const allHevyIds = state => {const ids=new Set();Object.values(state.days||{}).forEach(d=>(d.exercises||[]).forEach(e=>{if(e.hevyId)ids.add(e.hevyId);}));return ids;};
 function importEntries(setState,rows,replace){
   const seq={};
   const built=rows.map(r=>{const i=seq[r.date]=(seq[r.date]||0)+1;
-    return {date:r.date,entry:{id:uid(),name:r.name,meal:r.meal,quantity:r.quantity,calories:Math.round(r.calories),protein:Math.round(r.protein),carbs:Math.round(r.carbs),sugar:Math.round(r.sugar),fat:Math.round(r.fat),saturatedFat:Math.round(r.saturatedFat),fiber:Math.round(r.fiber),salt:Math.round(r.salt*10)/10,note:r.note,source:'import',time:isoAt(r.date,MEALS[r.meal].hour,i)}};});
+    const real=r.time?isoFromHM(r.date,r.time):null;
+    return {date:r.date,entry:{id:uid(),name:r.name,meal:r.meal,quantity:r.quantity,calories:Math.round(r.calories),protein:Math.round(r.protein),carbs:Math.round(r.carbs),sugar:Math.round(r.sugar),fat:Math.round(r.fat),saturatedFat:Math.round(r.saturatedFat),fiber:Math.round(r.fiber),salt:Math.round(r.salt*10)/10,note:r.note,source:'import',time:real||isoAt(r.date,MEALS[r.meal].hour,i),timeSet:!!real}};});
   setState(s=>{
     const days={...s.days};
     if(replace){[...new Set(rows.map(r=>r.date))].forEach(dt=>{const d=days[dt]||{date:dt,foods:[],exercises:[]};days[dt]={...d,foods:[]};});}
@@ -660,13 +756,14 @@ function copyDay(setState,from,to){
 /* ---------- UI-Bausteine ---------- */
 function Ring({consumed,budget}){
   const size=200,stroke=18,r=(size-stroke)/2,c=2*Math.PI*r;
-  const frac=budget>0?Math.min(consumed/budget,1):0, over=consumed>budget, rem=budget-consumed;
+  const target=budget>0?Math.min(consumed/budget,1):0, over=consumed>budget, rem=budget-consumed;
+  const [frac,setFrac]=useState(0); useEffect(()=>{const t=requestAnimationFrame(()=>setFrac(target));return ()=>cancelAnimationFrame(t);},[target]);
   return (
     <div className="ring-wrap">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--track)" strokeWidth={stroke}/>
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={over?'var(--danger)':'var(--accent)'} strokeWidth={stroke}
-          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c*(1-frac)} transform={`rotate(-90 ${size/2} ${size/2})`}/>
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c*(1-frac)} transform={`rotate(-90 ${size/2} ${size/2})`} className="ring-arc"/>
       </svg>
       <div className="ring-center">
         <div className={'ring-value'+(over?' over':'')}>{Math.abs(rem)}</div>
@@ -712,15 +809,52 @@ const DayBars=({data,unit='',color='var(--data)',refLabel='Budget'})=>{
         <div className="bchart-grid">{[0,25,50,75,100].map(y=><i key={y} style={{bottom:y+'%'}}/>)}</div>
         {refPct!=null&&<div className="bchart-refline" style={{bottom:Math.min(refPct,100)+'%'}}/>}
         <div className="bchart-bars">{data.map(d=>{const h=(d.value/max)*100;return (
-          <div className="bchart-col" key={d.key} title={`${d.key}: ${d.value}${unit}`}>
+          <div className="bchart-col" key={d.key} title={`${d.label!=null?d.label:d.key}: ${d.value}${unit}`}>
             <div className={'bchart-bar'+(d.over?' over':'')} style={{height:Math.max(h,d.value>0?2:0)+'%',background:d.over?undefined:color}}/>
           </div>);})}</div>
         {refPct!=null&&<div className="bchart-reflabel" style={{bottom:Math.min(refPct,100)+'%'}}><span className={refLeft?'left':''}>{refLabel} {Math.round(refVal)}</span></div>}
       </div>
-      <div className="bchart-xaxis">{data.map((d,i)=><span key={d.key}>{i%step===0?d.key.slice(8):''}</span>)}</div>
+      <div className="bchart-xaxis">{data.map((d,i)=><span key={d.key}>{i%step===0?(d.label!=null?d.label:d.key.slice(8)):''}</span>)}</div>
     </div>
   </div>);
 };
+/* Weiches Flächendiagramm mit Hover-Werten (Zeitverlauf). Lücken = nicht erfasste Tage. */
+function smoothPath(seg,yMin,yMax){
+  if(seg.length===1)return `M${seg[0].x},${seg[0].y}`;
+  const cl=v=>Math.max(yMin,Math.min(yMax,v)); let d=`M${seg[0].x},${seg[0].y}`;
+  for(let i=0;i<seg.length-1;i++){const p0=seg[i-1]||seg[i],p1=seg[i],p2=seg[i+1],p3=seg[i+2]||p2;
+    d+=` C${p1.x+(p2.x-p0.x)/6},${cl(p1.y+(p2.y-p0.y)/6)} ${p2.x-(p3.x-p1.x)/6},${cl(p2.y-(p3.y-p1.y)/6)} ${p2.x},${p2.y}`;}
+  return d;
+}
+function AreaChart({data,unit='',color='var(--data)',refLabel='Budget',height=210}){
+  const wrap=useRef(null); const [w,setW]=useState(600); const [hi,setHi]=useState(null);
+  useEffect(()=>{const el=wrap.current;if(!el)return;const m=()=>setW(el.clientWidth||600);m();if(window.ResizeObserver){const ro=new ResizeObserver(m);ro.observe(el);return ()=>ro.disconnect();}window.addEventListener('resize',m);return ()=>window.removeEventListener('resize',m);},[]);
+  const padL=36,padR=12,padT=16,padB=26, iw=Math.max(10,w-padL-padR), ih=height-padT-padB;
+  const refVal=(data.find(d=>d.ref!=null)||{}).ref;
+  const rawMax=Math.max(...data.map(d=>Math.max(d.value||0,d.ref||0)),1); const max=niceMax(rawMax*1.08);
+  const n=data.length; const X=i=>padL+(n>1?i/(n-1)*iw:iw/2); const Y=v=>padT+ih-(v/max)*ih;
+  const pts=data.map((d,i)=>d.value==null?null:{x:X(i),y:Y(d.value),d,i});
+  const segs=[]; let cur=[]; pts.forEach(p=>{if(p)cur.push(p);else{if(cur.length)segs.push(cur);cur=[];}}); if(cur.length)segs.push(cur);
+  const avgPts=n>=14?data.map((d,i)=>{const win=data.slice(Math.max(0,i-6),i+1).map(v=>v.value).filter(v=>v!=null);return win.length>=3?{x:X(i),y:Y(avgF(win))}:null;}).filter(Boolean):[];
+  const step=n<=14?1:Math.ceil(n/8);
+  const gid=useMemo(()=>'ag'+Math.random().toString(36).slice(2,7),[]);
+  const onMove=e=>{const r=wrap.current.getBoundingClientRect();const mx=e.clientX-r.left-padL;let i=Math.round(mx/iw*(n-1));i=Math.max(0,Math.min(n-1,i));setHi(i);};
+  const hp=hi!=null?pts[hi]:null; const hd=hi!=null?data[hi]:null;
+  const tipLeft=hp?Math.min(Math.max(hp.x,70),w-70):0;
+  return (<div className="achart" ref={wrap} onMouseMove={onMove} onMouseLeave={()=>setHi(null)} onTouchStart={e=>onMove(e.touches[0])} onTouchMove={e=>onMove(e.touches[0])}>
+    <svg width={w} height={height} className="achart-svg">
+      <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".28"/><stop offset="1" stopColor={color} stopOpacity=".02"/></linearGradient></defs>
+      {[0,.25,.5,.75,1].map(f=>(<g key={f}><line x1={padL} x2={w-padR} y1={Y(max*f)} y2={Y(max*f)} className="achart-grid"/><text x={padL-6} y={Y(max*f)+3} className="achart-ylab">{fmtK(max*f)}</text></g>))}
+      {segs.map((sg,k)=>(<g key={k}><path d={smoothPath(sg,padT,padT+ih)+` L${sg[sg.length-1].x},${Y(0)} L${sg[0].x},${Y(0)} Z`} fill={`url(#${gid})`}/><path d={smoothPath(sg,padT,padT+ih)} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" className="achart-line"/></g>))}
+      {avgPts.length>1&&<path d={smoothPath(avgPts,padT,padT+ih)} fill="none" stroke="var(--text)" strokeOpacity=".45" strokeWidth="1.5" strokeDasharray="3 4"/>}
+      {refVal!=null&&<g><line x1={padL} x2={w-padR} y1={Y(refVal)} y2={Y(refVal)} className="achart-ref"/><text x={w-padR} y={Y(refVal)-5} className="achart-reflab">{refLabel} {Math.round(refVal)}</text></g>}
+      {pts.map(p=>p&&<circle key={p.i} cx={p.x} cy={p.y} r={hi===p.i?5:3} className={'achart-dot'+(p.d.over?' over':'')} style={{fill:p.d.over?'var(--danger)':color}}/>)}
+      {hp&&<line x1={hp.x} x2={hp.x} y1={padT} y2={padT+ih} className="achart-cursor"/>}
+      {data.map((d,i)=>i%step===0&&<text key={d.key} x={X(i)} y={height-6} className="achart-xlab">{d.label!=null?d.label:d.key.slice(8)}</text>)}
+    </svg>
+    {hd&&<div className="achart-tip" style={{left:tipLeft}}><b>{hd.value!=null?Math.round(hd.value*10)/10+unit:'nicht erfasst'}</b><span>{hd.title||dateLabel(hd.key)}{hd.ref!=null&&hd.value!=null?' · '+(hd.value>hd.ref?'+':'')+Math.round(hd.value-hd.ref)+unit+' zum Ziel':''}</span></div>}
+  </div>);
+}
 function Heatmap({days,goal,onPick,weeks=9}){
   const today=todayKey();
   const startMon=getMonday(addDays(today,-7*(weeks-1)));
@@ -734,13 +868,16 @@ function Heatmap({days,goal,onPick,weeks=9}){
   </div>);
 }
 const Stat=({label,value,sub})=>(<div className="stat"><div className="stat-value">{value}</div><div className="stat-label">{label}</div>{sub&&<div className="stat-sub">{sub}</div>}</div>);
-const Overlay=({title,onClose,children})=>(
+function Overlay({title,onClose,children}){
+  useEffect(()=>{const k=e=>{if(e.key==='Escape'){e.stopPropagation();onClose();}};window.addEventListener('keydown',k,true);return ()=>window.removeEventListener('keydown',k,true);},[onClose]);
+  return (
   <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className="overlay-card">
       <div className="overlay-head"><h2>{title}</h2><button className="chip" onClick={onClose}><Icon name="close"/> Schließen</button></div>
       <div className="overlay-body">{children}</div>
     </div>
   </div>);
+}
 
 /* ---------- Tages-Übersicht für Claude ---------- */
 function buildDaySummary(state,date){
@@ -765,11 +902,11 @@ function buildDaySummary(state,date){
     const items=day.foods.filter(f=>f.meal===m); if(!items.length)return;
     L.push('');
     L.push(MEALS[m].icon+' '+MEALS[m].label+' ('+sumCal(items)+' kcal)');
-    items.forEach(f=>L.push('- '+f.name+(f.quantity?', '+f.quantity:'')+' — '+Math.round(f.calories)+' kcal (E'+f.protein+'/KH'+f.carbs+'/F'+f.fat+')'+(f.note?' · '+f.note:'')));
+    items.forEach(f=>L.push('- '+(hasRealTime(f)?timeLabel(f.time)+' ':'')+f.name+(f.quantity?', '+f.quantity:'')+' — '+Math.round(f.calories)+' kcal (E'+f.protein+'/KH'+f.carbs+'/F'+f.fat+')'+(f.note?' · '+f.note:'')));
   });
   if(day.exercises.length){
     L.push('');
-    L.push('Sport: '+day.exercises.map(e=>e.name+(e.durationMin?' '+e.durationMin+' min':'')+' (−'+Math.round(e.calories)+' kcal)').join(', '));
+    L.push('Training: '+day.exercises.map(e=>e.name+' ('+EX_TYPES[exType(e)].label+(e.durationMin?', '+e.durationMin+' min':'')+(e.intensity?', '+EX_INT[e.intensity]:'')+', −'+Math.round(e.calories)+' kcal)').join(', '));
   }
   if(!day.foods.length) L.push('\n(An diesem Tag wurde noch nichts erfasst.)');
   L.push('');
@@ -800,7 +937,7 @@ function DayShareOverlay({state,date,onClose}){
 
 /* ---------- KI-Erfassung (Claude über Supabase Edge Function) ---------- */
 function rowsToTsv(rows){
-  return rows.map(r=>[deDate(r.date),MEALS[r.meal].label,r.name,r.quantity||'',deNum(r.calories),deNum(r.protein),deNum(r.carbs),deNum(r.sugar),deNum(r.fat),deNum(r.saturatedFat),deNum(r.fiber),deNum(r.salt),(r.note||'').replace(/[\t\n]+/g,' ')].join('\t')).join('\n');
+  return rows.map(r=>[deDate(r.date),MEALS[r.meal].label,r.name,r.quantity||'',deNum(r.calories),deNum(r.protein),deNum(r.carbs),deNum(r.sugar),deNum(r.fat),deNum(r.saturatedFat),deNum(r.fiber),deNum(r.salt),(r.note||'').replace(/[\t\n]+/g,' '),r.time||''].join('\t')).join('\n');
 }
 function shrinkImage(file,max=1280){
   return new Promise((resolve,reject)=>{
@@ -819,6 +956,8 @@ function shrinkImage(file,max=1280){
 }
 function AiCapture({state,cloud,date,onRows}){
   const [desc,setDesc]=useState(''),[aiDate,setAiDate]=useState(date||todayKey()),[meal,setMeal]=useState(defaultMeal());
+  const [time,setTime]=useState(()=>defaultHM(date||todayKey(),defaultMeal())),[timeTouched,setTimeTouched]=useState(false);
+  useEffect(()=>{if(!timeTouched)setTime(defaultHM(aiDate,meal==='auto'?defaultMeal():meal));},[aiDate,meal]);
   const [img,setImg]=useState(null),[busy,setBusy]=useState(false),[err,setErr]=useState(null),[hint,setHint]=useState(null);
   const fileRef=useRef(null);
   async function onFile(e){const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;setErr(null);try{setImg(await shrinkImage(f));}catch(x){setErr('Foto konnte nicht gelesen werden.');}}
@@ -827,7 +966,7 @@ function AiCapture({state,cloud,date,onRows}){
     setBusy(true);setErr(null);setHint(null);
     try{
       const res=await cloudNutrition({text:desc,image:img?{media_type:img.media_type,data:img.data}:null,date:aiDate,meal:meal==='auto'?null:meal,preferences:state.goal.preferences||''});
-      const rows=(res.rows||[]).map(r=>({...r,date:aiDate,meal:meal==='auto'?(MEALS[r.meal]?r.meal:'snack'):meal}));
+      const rows=(res.rows||[]).map(r=>({...r,date:aiDate,meal:meal==='auto'?(MEALS[r.meal]?r.meal:'snack'):meal,time:parseHM(time)?time:undefined}));
       if(!rows.length)throw new Error(res.note||'Keine Lebensmittel erkannt.');
       onRows(rows,res.note||''); setDesc(''); setImg(null);
     }catch(x){setErr(cloudErrMsg(x));}
@@ -839,13 +978,14 @@ function AiCapture({state,cloud,date,onRows}){
     <div className="card">
       <p className="muted small" style={{marginTop:0}}>Beschreib frei, was du gegessen hast (Mengen helfen) – oder fotografiere Mahlzeit, Verpackung oder Nährwerttabelle. Claude schätzt die Nährwerte, du prüfst die Vorschau.</p>
       <textarea className="pref-text" placeholder="z.B. 400 g Naturjoghurt 3,5 %, 100 g Himbeeren, 1 Proteinriegel" value={desc} onChange={e=>setDesc(e.target.value)} rows={4} disabled={busy}/>
-      <div className="field-grid two" style={{marginTop:10}}>
+      <div className="field-grid" style={{marginTop:10}}>
         <div className="field"><label>Datum</label><input type="date" value={aiDate} max={todayKey()} onChange={e=>{if(e.target.value)setAiDate(e.target.value);}} disabled={busy}/></div>
         <div className="field"><label>Mahlzeit</label>
           <select value={meal} onChange={e=>setMeal(e.target.value)} disabled={busy}>
             {MEAL_ORDER.map(m=><option key={m} value={m}>{MEALS[m].label}</option>)}
             <option value="auto">Automatisch (aus dem Text)</option>
           </select></div>
+        <div className="field"><label>Uhrzeit</label><input type="time" value={time} onChange={e=>{setTime(e.target.value);setTimeTouched(true);}} disabled={busy}/></div>
       </div>
       <div className="import-actions">
         <button className="chip" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}><Icon name="photo_camera"/> {img?'Anderes Foto':'Foto'}</button>
@@ -908,7 +1048,7 @@ function ImportPanel({state,setState,setDate,onClose,cloud,date,notify,initialMo
       {mode==='table' && <div className="card">
         {aiNote && <p className="muted small ai-note" style={{marginTop:0}}><Icon name="info"/> Hinweis von Claude: {aiNote}</p>}
         <p className="muted small" style={{marginTop:0}}>Tabelle aus der Zwischenablage einfügen (Tab- oder |-getrennt) oder das KI-Ergebnis hier nachbearbeiten. Spaltenreihenfolge:</p>
-        <code className="import-cols">Datum · Mahlzeit · Nahrungsmittel · Menge · kcal · Eiweiß · KH · Zucker · Fett · ges. FS · Ballaststoffe · Salz · Notiz</code>
+        <code className="import-cols">Datum · Mahlzeit · Nahrungsmittel · Menge · kcal · Eiweiß · KH · Zucker · Fett · ges. FS · Ballaststoffe · Salz · Notiz · Uhrzeit (optional, HH:MM)</code>
         <textarea className="import-text" placeholder="Hier die Tabelle einfügen…" value={text} onChange={e=>setText(e.target.value)} rows={8} spellCheck={false}/>
         <div className="import-actions">
           <button className="chip" onClick={()=>setText(IMPORT_EXAMPLE)}>Beispiel einfügen</button>
@@ -942,7 +1082,7 @@ function ImportPanel({state,setState,setDate,onClose,cloud,date,notify,initialMo
               return (<div className="preview-meal" key={meal}>
                 <div className="preview-meal-head">{MEALS[meal].icon} {MEALS[meal].label}</div>
                 {items.map((r,i)=>(<div className="preview-row" key={i}>
-                  <span className="preview-name">{r.name}{r.quantity&&<span className="muted"> · {r.quantity}</span>}</span>
+                  <span className="preview-name">{r.name}{r.quantity&&<span className="muted"> · {r.quantity}</span>}{r.time&&<span className="muted"> · {r.time}</span>}</span>
                   <span className="preview-kcal">{Math.round(r.calories)} kcal</span></div>))}
               </div>);
             })}
@@ -964,13 +1104,16 @@ const numDe = v => (+String(v).replace(',','.'))||0;
 const n2s = v => (v==null||v===0||v==='')?'':String(v);
 function Mini({label,v,set}){return (<label className="mini-field"><span>{label}</span><input inputMode="decimal" value={v} onChange={e=>set(e.target.value)}/></label>);}
 
-function FoodForm({onSubmit,initial,submitLabel}){
-  const base={name:'',meal:defaultMeal(),quantity:'',calories:'',protein:'',carbs:'',sugar:'',fat:'',saturatedFat:'',fiber:'',salt:'',note:''};
-  const init=initial?{name:initial.name||'',meal:initial.meal||defaultMeal(),quantity:initial.quantity||'',calories:n2s(initial.calories),protein:n2s(initial.protein),carbs:n2s(initial.carbs),sugar:n2s(initial.sugar),fat:n2s(initial.fat),saturatedFat:n2s(initial.saturatedFat),fiber:n2s(initial.fiber),salt:n2s(initial.salt),note:initial.note||''}:base;
+function FoodForm({onSubmit,initial,submitLabel,date}){
+  const day=date||todayKey();
+  const base={name:'',meal:defaultMeal(),quantity:'',calories:'',protein:'',carbs:'',sugar:'',fat:'',saturatedFat:'',fiber:'',salt:'',note:'',time:defaultHM(day,defaultMeal())};
+  const init=initial?{name:initial.name||'',meal:initial.meal||defaultMeal(),quantity:initial.quantity||'',calories:n2s(initial.calories),protein:n2s(initial.protein),carbs:n2s(initial.carbs),sugar:n2s(initial.sugar),fat:n2s(initial.fat),saturatedFat:n2s(initial.saturatedFat),fiber:n2s(initial.fiber),salt:n2s(initial.salt),note:initial.note||'',time:hasRealTime(initial)?timeLabel(initial.time):defaultHM(day,initial.meal||defaultMeal())}:base;
   const [v,setV]=useState(init);
   const [per100,setPer100]=useState(false);
   const [grams,setGrams]=useState('');
-  const ch=k=>val=>setV({...v,[k]:val});
+  const [timeTouched,setTimeTouched]=useState(!!(initial&&hasRealTime(initial)));
+  const ch=k=>val=>setV(x=>({...x,[k]:val}));
+  const setMeal=m=>setV(x=>({...x,meal:m,time:(!timeTouched&&day!==todayKey())?defaultHM(day,m):x.time}));
   return (
     <form className="form" onSubmit={e=>{e.preventDefault();if(!v.name.trim())return;
       const f=(per100&&numDe(grams)>0)?numDe(grams)/100:1;
@@ -978,12 +1121,14 @@ function FoodForm({onSubmit,initial,submitLabel}){
       onSubmit({name:v.name.trim(),meal:v.meal,
         quantity:(per100&&numDe(grams)>0)?(String(grams).replace(',','.')+' g'):(v.quantity.trim()||undefined),
         calories:sc(v.calories),protein:sc(v.protein),carbs:sc(v.carbs),sugar:sc(v.sugar),fat:sc(v.fat),saturatedFat:sc(v.saturatedFat),fiber:sc(v.fiber),salt:scS(v.salt),
-        note:v.note.trim()||undefined,source:initial?(initial.source||'manual'):'manual'});}}>
+        note:v.note.trim()||undefined,source:initial?(initial.source||'manual'):'manual',
+        time:isoFromHM(day,v.time)||(initial&&initial.time)||new Date().toISOString(),timeSet:!!parseHM(v.time)});}}>
       <input placeholder="Was hast du gegessen?" value={v.name} onChange={e=>ch('name')(e.target.value)} autoFocus/>
       <div className="form-grid two">
-        <select value={v.meal} onChange={e=>ch('meal')(e.target.value)}>{MEAL_ORDER.map(m=>(<option key={m} value={m}>{MEALS[m].icon} {MEALS[m].label}</option>))}</select>
-        <input placeholder="Menge (z.B. 200 g)" value={v.quantity} onChange={e=>ch('quantity')(e.target.value)} disabled={per100&&numDe(grams)>0}/>
+        <select value={v.meal} onChange={e=>setMeal(e.target.value)}>{MEAL_ORDER.map(m=>(<option key={m} value={m}>{MEALS[m].label}</option>))}</select>
+        <input type="time" value={v.time} onChange={e=>{ch('time')(e.target.value);setTimeTouched(true);}} title="Uhrzeit der Mahlzeit"/>
       </div>
+      <input placeholder="Menge (z.B. 200 g)" value={v.quantity} onChange={e=>ch('quantity')(e.target.value)} disabled={per100&&numDe(grams)>0}/>
       <label className="toggle" style={{fontSize:13}}><input type="checkbox" checked={per100} onChange={e=>setPer100(e.target.checked)}/><span>Werte pro 100 g eingeben</span></label>
       {per100 && <input inputMode="decimal" placeholder="Menge in Gramm (z.B. 250)" value={grams} onChange={e=>setGrams(e.target.value)}/>}
       <div className="form-grid">
@@ -1003,20 +1148,60 @@ function FoodForm({onSubmit,initial,submitLabel}){
     </form>
   );
 }
-function ExerciseForm({onSubmit}){
-  const [v,setV]=useState({name:'',durationMin:'',calories:''});
-  const ch=k=>e=>setV({...v,[k]:e.target.value});
+function ExerciseForm({onSubmit,initial,submitLabel,date,weight}){
+  const day=date||todayKey();
+  const init=initial?{name:initial.name||'',type:exType(initial),durationMin:n2s(initial.durationMin),calories:n2s(initial.calories),intensity:initial.intensity||'',note:initial.note||'',time:initial.time?timeLabel(initial.time):nowHM()}:{name:'',type:'strength',durationMin:'',calories:'',intensity:'',note:'',time:day===todayKey()?nowHM():'07:00'};
+  const [v,setV]=useState(init);
+  const ch=k=>e=>setV(x=>({...x,[k]:e.target.value}));
+  const est=estimateKcal(v.type,numDe(v.durationMin),weight);
   return (
     <form className="form" onSubmit={e=>{e.preventDefault();if(!v.name.trim())return;
-      onSubmit({name:v.name.trim(),durationMin:v.durationMin?+v.durationMin:undefined,calories:+v.calories||0});}}>
-      <input placeholder="Aktivität (z.B. Joggen)" value={v.name} onChange={ch('name')} autoFocus/>
+      onSubmit({name:v.name.trim(),type:v.type,durationMin:v.durationMin?numDe(v.durationMin):undefined,calories:v.calories!==''?numDe(v.calories):est,intensity:v.intensity||undefined,note:v.note.trim()||undefined,time:isoFromHM(day,v.time)||(initial&&initial.time)||new Date().toISOString(),timeSet:!!parseHM(v.time),source:initial?(initial.source||'manual'):'manual'});}}>
+      <input placeholder="Aktivität (z.B. Krafttraining, Laufen)" value={v.name} onChange={ch('name')} autoFocus/>
       <div className="form-grid two">
-        <input inputMode="numeric" placeholder="Minuten" value={v.durationMin} onChange={ch('durationMin')}/>
-        <input inputMode="numeric" placeholder="kcal verbrannt" value={v.calories} onChange={ch('calories')}/>
+        <select value={v.type} onChange={ch('type')}>{Object.keys(EX_TYPES).map(t=><option key={t} value={t}>{EX_TYPES[t].label}</option>)}</select>
+        <input type="time" value={v.time} onChange={ch('time')} title="Beginn"/>
       </div>
-      <button type="submit" className="primary">Hinzufügen</button>
+      <div className="form-grid two">
+        <div className="num-suffix"><input inputMode="numeric" placeholder="Dauer" value={v.durationMin} onChange={ch('durationMin')}/><span>min</span></div>
+        <div className="num-suffix"><input inputMode="numeric" placeholder={est?'≈ '+est:'kcal'} value={v.calories} onChange={ch('calories')}/><span>kcal</span></div>
+      </div>
+      <div className="seg full">{Object.keys(EX_INT).map(k=>(<button type="button" key={k} className={v.intensity===k?'on':''} onClick={()=>setV(x=>({...x,intensity:x.intensity===k?'':k}))}>{EX_INT[k]}</button>))}</div>
+      <input placeholder="Notiz (optional)" value={v.note} onChange={ch('note')}/>
+      {!v.calories && est>0 && <p className="muted small" style={{margin:0}}>Ohne Angabe werden ≈ {est} kcal geschätzt (MET-Richtwert × {weight||75} kg × Dauer).</p>}
+      <button type="submit" className="primary">{submitLabel||'Hinzufügen'}</button>
     </form>
   );
+}
+/* ---------- Hevy-Import ---------- */
+function HevyOverlay({state,setState,onClose,notify}){
+  const [busy,setBusy]=useState(true),[err,setErr]=useState(null),[list,setList]=useState([]),[sel,setSel]=useState({});
+  const have=useMemo(()=>allHevyIds(state),[state.days]);
+  useEffect(()=>{let on=true;(async()=>{try{const since=new Date(Date.now()-30*86400000).toISOString();const res=await cloudHevy(since);const ws=(res.workouts||[]);if(!on)return;setList(ws);const s0={};ws.forEach(w=>{if(!have.has(w.id))s0[w.id]=true;});setSel(s0);}catch(e){if(on)setErr(cloudErrMsg(e));}finally{if(on)setBusy(false);}})();return ()=>{on=false;};},[]);
+  const chosen=list.filter(w=>sel[w.id]&&!have.has(w.id));
+  function doImport(){
+    const weight=state.profile.weight; let n=0;
+    chosen.forEach(w=>{const d=new Date(w.start);const date=todayKey(d);const dur=w.durationMin||0;
+      const note=['Hevy',w.exerciseCount+' Übungen',w.setCount+' Sätze',w.volumeKg?('Volumen '+w.volumeKg.toLocaleString('de-DE')+' kg'):null].filter(Boolean).join(' · ');
+      addExTo(setState,date,{name:w.title,type:'strength',durationMin:dur||undefined,calories:estimateKcal('strength',dur,weight),note,time:w.start,timeSet:true,source:'hevy',hevyId:w.id,volumeKg:w.volumeKg,sets:w.setCount,exercises:w.exercises.map(x=>x.title)});n++;});
+    if(notify)notify(n+' Workout'+(n===1?'':'s')+' aus Hevy übernommen'); onClose();
+  }
+  return (<Overlay title="Aus Hevy importieren" onClose={onClose}>
+    <div className="card">
+      {busy && <p className="muted small" style={{margin:0}}><Icon name="progress_activity" className="spin"/> Lade Workouts der letzten 30 Tage …</p>}
+      {err && <p className="ai-err" style={{marginTop:0}}><Icon name="error"/> {err}</p>}
+      {!busy && !err && list.length===0 && <p className="empty" style={{margin:0}}>Keine Workouts in den letzten 30 Tagen.</p>}
+      {list.map(w=>{const done=have.has(w.id);const d=new Date(w.start);return (
+        <label key={w.id} className={'hevy-row'+(done?' done':'')}>
+          <input type="checkbox" disabled={done} checked={!!sel[w.id]&&!done} onChange={e=>setSel(x=>({...x,[w.id]:e.target.checked}))}/>
+          <span className="hevy-main"><span className="hevy-title">{w.title}</span>
+            <span className="muted small">{d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} {timeLabel(w.start)}{w.durationMin?' · '+w.durationMin+' min':''} · {w.exerciseCount} Übungen · {w.setCount} Sätze{w.volumeKg?' · '+w.volumeKg.toLocaleString('de-DE')+' kg':''}</span>
+            <span className="muted small ellipsis">{w.exercises.map(x=>x.title).join(', ')}</span></span>
+          {done&&<span className="hevy-tag">importiert</span>}
+        </label>);})}
+      {!busy && !err && list.length>0 && <div className="import-actions"><button className="primary" disabled={!chosen.length} onClick={doImport}><Icon name="download"/> {chosen.length} importieren</button><span className="muted small" style={{alignSelf:'center'}}>Kalorien werden geschätzt (MET 5 × Gewicht × Dauer) und sind nachträglich änderbar.</span></div>}
+    </div>
+  </Overlay>);
 }
 
 /* Tages-Zusammenfassung: Bausteine für Dashboard (alle Größen) und Heute-Seitenpanel (Desktop). */
@@ -1046,6 +1231,7 @@ function MacroCard({state,date}){
         <MacroBar label="Fett" value={totals.fat} target={target.fat} color="var(--fat)"/>
       </div>
     </div>
+    {+state.profile.weight>0 && <p className="muted small" style={{margin:'10px 0 0'}}>Eiweiß: <strong>{(Math.round(totals.protein/state.profile.weight*10)/10).toLocaleString('de-DE')} g/kg</strong> Körpergewicht (Richtwert 1,6–2,2 g/kg bei Training)</p>}
   </section>);
 }
 function NutrientCard({state,date}){
@@ -1057,6 +1243,30 @@ function NutrientCard({state,date}){
     <MacroBar label="Zucker" value={totals.sugar} target={goal.sugarLimit} color="var(--sugar)" limit/>
     <MacroBar label="ges. Fettsäuren" value={totals.saturatedFat} target={goal.satFatLimit} color="var(--satfat)" limit/>
     <MacroBar label="Salz" value={totals.salt} target={goal.saltLimit} color="var(--salt)" limit/>
+  </section>);
+}
+function TimelineCard({state,date}){
+  const day=state.days[date]; const st=eatingStats(day); const fast=fastingBefore(state.days,date);
+  const pct=h=>Math.max(0,Math.min(100,h/24*100));
+  return (<section className="card">
+    <h3 className="card-title"><Icon name="schedule"/> Essenszeiten</h3>
+    {!st ? <p className="empty" style={{margin:0}}>Noch keine Uhrzeiten an diesem Tag. Sie kommen aus der manuellen Eingabe, der KI-Erfassung oder der Import-Spalte „Uhrzeit“.</p> : (<>
+      <div className="tl">
+        <div className="tl-track">
+          <div className="tl-window" style={{left:pct(st.first)+'%',width:Math.max(0.6,pct(st.last)-pct(st.first))+'%'}}/>
+          {st.ts.map((t,i)=>{const sz=8+Math.min(14,Math.round(t.kcal/st.total*28));return <span key={i} className="tl-dot" title={fmtClock(t.h)+' · '+t.name+' · '+Math.round(t.kcal)+' kcal'} style={{left:pct(t.h)+'%',width:sz,height:sz}}/>;})}
+        </div>
+        <div className="tl-axis">{[0,6,12,18,24].map(h=><span key={h} style={{left:pct(h)+'%'}}>{h}</span>)}</div>
+      </div>
+      <div className="tl-stats">
+        <div><b>{fmtClock(st.first)}</b><span>erste</span></div>
+        <div><b>{fmtClock(st.last)}</b><span>letzte</span></div>
+        <div><b>{fmtDur(st.window)}</b><span>Fenster</span></div>
+        <div><b>{fast!=null?fmtDur(fast):'–'}</b><span>Nachtfasten</span></div>
+      </div>
+      {st.lateShare>0 && <p className="muted small" style={{margin:'8px 0 0'}}>{Math.round(st.lateShare*100)} % der Kalorien nach 20 Uhr{st.ts.length<day.foods.length?' · '+(day.foods.length-st.ts.length)+' Einträge ohne Uhrzeit':''}</p>}
+      {st.lateShare===0 && st.ts.length<day.foods.length && <p className="muted small" style={{margin:'8px 0 0'}}>{day.foods.length-st.ts.length} Einträge ohne Uhrzeit</p>}
+    </>)}
   </section>);
 }
 function DateNav({date,setDate}){
@@ -1091,6 +1301,7 @@ function Dashboard({state,setState,date,setDate,openImport}){
       </div>
       <div className="col">
         <NutrientCard state={state} date={date}/>
+        <TimelineCard state={state} date={date}/>
         <section className="card">
           <h3 className="card-title">Tagestyp</h3>
           <DayTypeSeg state={state} setState={setState} date={date}/>
@@ -1107,9 +1318,9 @@ function Dashboard({state,setState,date,setDate,openImport}){
   );
 }
 
-function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
+function Today({state,setState,date,setDate,openImport,notify,manualSignal,cloud}){
   const day=state.days[date]||{date,foods:[],exercises:[]};
-  const [openF,setOpenF]=useState(false),[openE,setOpenE]=useState(false),[editId,setEditId]=useState(null),[share,setShare]=useState(false);
+  const [openF,setOpenF]=useState(false),[openE,setOpenE]=useState(false),[editId,setEditId]=useState(null),[editEx,setEditEx]=useState(null),[share,setShare]=useState(false),[hevy,setHevy]=useState(false);
   useEffect(()=>{if(manualSignal){setEditId(null);setOpenF(true);}},[manualSignal]);
   const rmFood=id=>setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,foods:d.foods.filter(x=>x.id!==id)}}};});
   const rmEx=id=>setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,exercises:d.exercises.filter(x=>x.id!==id)}}};});
@@ -1141,7 +1352,7 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
           <div className="section-actions">
             <button className="chip" onClick={()=>{setEditId(null);setOpenF(o=>!o);}}>{openF?<Icon name="close"/>:<><Icon name="add"/> manuell</>}</button>
           </div></div>
-        {openF && <FoodForm onSubmit={f=>{addFoodTo(setState,date,f);setOpenF(false);notify('Eingetragen: '+f.name);}}/>}
+        {openF && <FoodForm date={date} onSubmit={f=>{addFoodTo(setState,date,f);setOpenF(false);notify('Eingetragen: '+f.name);}}/>}
         {day.foods.length===0 && !openF && <p className="empty">Noch nichts erfasst. Erfasse per KI, Tabelle oder „+ manuell".</p>}
         {MEAL_ORDER.map(meal=>{
           const items=day.foods.filter(f=>f.meal===meal); if(!items.length)return null;
@@ -1151,12 +1362,12 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
               <span className="meal-title"><Icon name={MEALS[meal].icon}/> {MEALS[meal].label}{isColl&&<span className="meal-count">{items.length}</span>}</span>
               <span className="meal-head-right"><span className="meal-kcal">{sumCal(items)} kcal</span><Icon name="expand_more" className="meal-chevron"/></span></button>
             {!isColl && <ul className="entries">{items.map(f=> editId===f.id
-              ? (<li key={f.id}><FoodForm initial={f} submitLabel="Speichern" onSubmit={data=>{updateFood(setState,date,f.id,data);setEditId(null);}}/></li>)
+              ? (<li key={f.id}><FoodForm date={date} initial={f} submitLabel="Speichern" onSubmit={data=>{updateFood(setState,date,f.id,data);setEditId(null);}}/></li>)
               : (
               <li className="entry" key={f.id}>
                 <div className="entry-main"><span className="entry-head"><span className="entry-name">{f.name}</span>
                   {f.quantity&&<span className="entry-qty">{f.quantity}</span>}</span>
-                  <span className="entry-macros">E {f.protein} · KH {f.carbs} · F {f.fat} g{f.fiber?(' · Bst '+f.fiber+' g'):''}{f.source!=='import'&&timeLabel(f.time)?(' · '+timeLabel(f.time)):''}</span>
+                  <span className="entry-macros">E {f.protein} · KH {f.carbs} · F {f.fat} g{f.fiber?(' · Bst '+f.fiber+' g'):''}{hasRealTime(f)&&timeLabel(f.time)?(' · '+timeLabel(f.time)):''}</span>
                   {f.note&&<span className="entry-note">{f.note}</span>}</div>
                 <div className="entry-kcal">{Math.round(f.calories)}</div>
                 <div className="entry-actions">
@@ -1169,23 +1380,32 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
       </section>
 
       <section className="card">
-        <div className="section-head"><h3 className="card-title">Sport</h3>
-          <div className="section-actions"><button className="chip" onClick={()=>setOpenE(o=>!o)}>{openE?<Icon name="close"/>:<><Icon name="add"/> erfassen</>}</button></div></div>
-        {openE && <ExerciseForm onSubmit={e=>{addExTo(setState,date,e);setOpenE(false);}}/>}
-        {day.exercises.length===0 && !openE && <p className="empty">Noch kein Sport erfasst.</p>}
-        <ul className="entries">{day.exercises.map(e=>(
+        <div className="section-head"><h3 className="card-title">Training</h3>
+          <div className="section-actions">
+            {cloud&&cloud.user&&<button className="chip" title="Workouts aus Hevy übernehmen" onClick={()=>setHevy(true)}><Icon name="cloud_download"/> Hevy</button>}
+            <button className="chip" onClick={()=>{setEditEx(null);setOpenE(o=>!o);}}>{openE?<Icon name="close"/>:<><Icon name="add"/> erfassen</>}</button></div></div>
+        {openE && <ExerciseForm date={date} weight={state.profile.weight} onSubmit={e=>{addExTo(setState,date,e);setOpenE(false);notify('Training eingetragen');}}/>}
+        {day.exercises.length===0 && !openE && <p className="empty">Noch kein Training erfasst.</p>}
+        <ul className="entries">{day.exercises.map(e=> editEx===e.id
+          ? (<li key={e.id}><ExerciseForm date={date} weight={state.profile.weight} initial={e} submitLabel="Speichern" onSubmit={data=>{updateEx(setState,date,e.id,data);setEditEx(null);}}/></li>)
+          : (
           <li className="entry" key={e.id}>
-            <div className="entry-main"><span className="entry-name">{e.name}</span>
-              <span className="entry-macros">{e.durationMin?e.durationMin+' min · ':''}{timeLabel(e.time)}</span></div>
+            <div className="entry-main"><span className="entry-head"><span className="entry-name"><Icon name={EX_TYPES[exType(e)].icon} className="ex-icon"/> {e.name}</span>{e.source==='hevy'&&<span className="entry-qty">Hevy</span>}</span>
+              <span className="entry-macros">{[EX_TYPES[exType(e)].label,e.durationMin?e.durationMin+' min':null,e.intensity?EX_INT[e.intensity]:null,e.time?timeLabel(e.time):null].filter(Boolean).join(' · ')}</span>
+              {e.note&&<span className="entry-note">{e.note}</span>}</div>
             <div className="entry-kcal burn">−{Math.round(e.calories)}</div>
-            <div className="entry-actions"><button className="del" title="Löschen" onClick={()=>rmEx(e.id)}><Icon name="close"/></button></div>
+            <div className="entry-actions">
+              <button className="icon-btn" title="Bearbeiten" onClick={()=>{setOpenE(false);setEditEx(e.id);}}><Icon name="edit"/></button>
+              <button className="del" title="Löschen" onClick={()=>rmEx(e.id)}><Icon name="close"/></button></div>
           </li>))}</ul>
       </section>
+      {hevy && <HevyOverlay state={state} setState={setState} notify={notify} onClose={()=>setHevy(false)}/>}
       </div>
       <aside className="today-side wide-only">
         <div className="card side-seg"><div className="section-label" style={{marginBottom:8}}>Tagestyp</div><DayTypeSeg state={state} setState={setState} date={date}/></div>
         <HeroCard state={state} date={date}/>
         <MacroCard state={state} date={date}/>
+        <TimelineCard state={state} date={date}/>
         <NutrientCard state={state} date={date}/>
       </aside>
       </div>
@@ -1198,7 +1418,46 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
 const METRICS=[{id:'calories',label:'Kalorien',unit:' kcal'},{id:'protein',label:'Eiweiß',unit:' g'},{id:'carbs',label:'KH',unit:' g'},{id:'fat',label:'Fett',unit:' g'},{id:'fiber',label:'Ballaststoffe',unit:' g'},{id:'sugar',label:'Zucker',unit:' g'},{id:'salt',label:'Salz',unit:' g'}];
 const METRIC_COLOR={calories:'var(--data)',protein:'var(--protein)',carbs:'var(--carbs)',fat:'var(--fat)',fiber:'var(--fiber)',sugar:'var(--sugar)',salt:'var(--salt)'};
 const avgArr = arr => arr.length?Math.round((arr.reduce((a,b)=>a+b,0)/arr.length)*10)/10:0;
-function Stats({state,setDate,goToToday}){
+const isoWeek = k=>{const[y,m,d]=k.split('-').map(Number);const dt=new Date(Date.UTC(y,m-1,d));const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);const y0=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil(((dt-y0)/86400000+1)/7);};
+const avgF = a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const WD=['Mo','Di','Mi','Do','Fr','Sa','So'];
+const wdIndex = k=>{const[y,m,d]=k.split('-').map(Number);return (new Date(y,m-1,d).getDay()+6)%7;};
+/* Daten einer Kalenderwoche für den Claude-Wochenbericht. */
+function buildWeekPayload(state,mon){
+  const {profile,goal,days}=state; const today=todayKey();
+  const list=[]; for(let i=0;i<7;i++){const k=addDays(mon,i); if(k>today)break; const d=days[k]; if(!d||!d.foods.length){list.push({date:k,weekday:WD[wdIndex(k)],tracked:false});continue;}
+    const t=sumNut(d.foods), st=eatingStats(d), fast=fastingBefore(days,k);
+    list.push({date:k,weekday:WD[wdIndex(k)],tracked:true,training:!!d.training,budget:dailyBudget(goal,d),kcal:t.calories,protein:t.protein,carbs:t.carbs,fat:t.fat,fiber:t.fiber,sugar:t.sugar,salt:t.salt,entries:d.foods.length,
+      firstMeal:st?fmtClock(st.first):null,lastMeal:st?fmtClock(st.last):null,eatingWindowH:st?Math.round(st.window*10)/10:null,fastingH:fast!=null?Math.round(fast*10)/10:null,lateShare:st?Math.round(st.lateShare*100):null,
+      meals:MEAL_ORDER.map(m=>({meal:MEALS[m].label,kcal:sumCal(d.foods.filter(f=>f.meal===m))})).filter(x=>x.kcal>0),
+      topFoods:[...d.foods].sort((a,b)=>b.calories-a.calories).slice(0,4).map(f=>f.name+' ('+Math.round(f.calories)+' kcal)'),
+      exercises:(d.exercises||[]).map(e=>({name:e.name,type:e.type||null,min:e.durationMin||null,kcal:Math.round(e.calories||0)}))});}
+  return {week:'KW '+isoWeek(mon)+' ab '+deDate(mon),profile:{sex:profile.sex,age:profile.age,height:profile.height,weight:profile.weight,targetWeight:profile.targetWeight},
+    goals:{kcalTraining:goal.kcalTraining,kcalRest:goal.kcalRest,proteinTraining:goal.proteinTraining,proteinRest:goal.proteinRest,fiberGoal:goal.fiberGoal,sugarLimit:goal.sugarLimit,saltLimit:goal.saltLimit},
+    preferences:goal.preferences||'',days:list};
+}
+function WeeklyReportCard({state,setState,cloud,notify}){
+  const today=todayKey(); const thisMon=getMonday(today);
+  const [which,setWhich]=useState(0); const [busy,setBusy]=useState(false); const [err,setErr]=useState(null);
+  const mon=addDays(thisMon,-7*which); const key=mon; const rep=(state.reports||{})[key];
+  const payload=useMemo(()=>buildWeekPayload(state,mon),[state.days,state.goal,state.profile,mon]);
+  const tracked=payload.days.filter(d=>d.tracked).length;
+  async function run(){ if(busy)return; setBusy(true); setErr(null);
+    try{ const res=await cloudReport(payload); if(!res.text)throw new Error('Leere Antwort'); setState(s=>({...s,reports:{...(s.reports||{}),[key]:{text:res.text,createdAt:new Date().toISOString(),model:res.model||''}}})); if(notify)notify('Wochenbericht erstellt'); }
+    catch(e){ setErr(cloudErrMsg(e)); } finally{ setBusy(false); } }
+  return (<section className="card">
+    <div className="section-head"><h3 className="card-title"><Icon name="auto_awesome"/> Wochenbericht von Claude</h3>
+      <div className="seg">{[['Diese Woche',0],['Letzte Woche',1],['Vorletzte',2]].map(([l,i])=>(<button key={i} className={which===i?'on':''} onClick={()=>setWhich(i)}>{l}</button>))}</div></div>
+    <p className="muted small" style={{marginTop:0}}>{payload.week} · {tracked} erfasste {tracked===1?'Tag':'Tage'}</p>
+    {rep && <div className="report">{rep.text.split(/\n+/).map((ln,i)=>{const t=ln.trim(); if(!t)return null; if(/^[-•*]\s/.test(t))return <li key={i}>{t.replace(/^[-•*]\s/,'')}</li>; return <p key={i}>{t}</p>;})}</div>}
+    {rep && <p className="muted small" style={{margin:'6px 0 0'}}>Erstellt {new Date(rep.createdAt).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}{rep.model?' · '+rep.model:''}</p>}
+    {err && <p className="ai-err"><Icon name="error"/> {err}</p>}
+    {(!cloud||!cloud.user)
+      ? <p className="muted small" style={{margin:'8px 0 0'}}>Für den Wochenbericht unter <strong>Profil → Cloud &amp; KI</strong> anmelden.</p>
+      : <div className="import-actions"><button className={rep?'chip':'primary'} disabled={busy||tracked===0} onClick={run}>{busy?<><Icon name="progress_activity" className="spin"/> Claude schreibt …</>:<><Icon name="auto_awesome"/> {rep?'Neu erstellen':'Bericht erstellen'}</>}</button>{tracked===0&&<span className="muted small" style={{alignSelf:'center'}}>Keine erfassten Tage in dieser Woche.</span>}</div>}
+  </section>);
+}
+function Stats({state,setState,setDate,goToToday,cloud,notify}){
   const {profile,goal,days}=state;
   const [range,setRange]=useState(7);
   const [metric,setMetric]=useState('calories');
@@ -1238,6 +1497,43 @@ function Stats({state,setDate,goToToday}){
   const balKg=Math.round(balance/KCAL_PER_KG*100)/100;
   let streak=0; for(let i=0;;i++){const k=addDays(today,-i);if((days[k]&&days[k].foods.length)>0)streak++;else break;}
 
+  /* Essenszeiten im Zeitraum */
+  const timeDays=tracked.map(r=>({key:r.key,st:eatingStats(days[r.key]),fast:fastingBefore(days,r.key)})).filter(x=>x.st);
+  const tAvg={window:avgF(timeDays.map(x=>x.st.window)),first:avgF(timeDays.map(x=>x.st.first)),last:avgF(timeDays.map(x=>x.st.last)),late:avgF(timeDays.map(x=>x.st.lateShare)),count:avgF(timeDays.map(x=>x.st.count)),gap:avgF(timeDays.flatMap(x=>x.st.gaps)),fast:avgF(timeDays.filter(x=>x.fast!=null).map(x=>x.fast)),fastN:timeDays.filter(x=>x.fast!=null).length};
+  const hourBins=Array.from({length:24},()=>0); timeDays.forEach(x=>x.st.ts.forEach(t=>{hourBins[Math.min(23,Math.floor(t.h))]+=t.kcal;}));
+  const hourData=hourBins.map((v,h)=>({key:'h'+h,label:h%3===0?String(h):'',value:timeDays.length?Math.round(v/timeDays.length):0}));
+
+  /* Wochen */
+  const nWeeks=Math.max(4,Math.ceil(range/7)); const thisMon=getMonday(today);
+  const weeks=[]; for(let w=nWeeks-1;w>=0;w--){const mon=addDays(thisMon,-7*w);const ks=[0,1,2,3,4,5,6].map(i=>addDays(mon,i)).filter(k=>k<=today);const tr=ks.filter(k=>days[k]&&days[k].foods.length).map(k=>{const d=days[k];return {t:sumNut(d.foods),b:dailyBudget(goal,d)};});
+    weeks.push({mon,label:'KW '+isoWeek(mon),from:deDate(mon).slice(0,5),tracked:tr.length,kcal:Math.round(avgF(tr.map(x=>x.t.calories))),protein:Math.round(avgF(tr.map(x=>x.t.protein))),within:tr.filter(x=>x.t.calories<=x.b).length,training:ks.filter(k=>days[k]&&days[k].training).length});}
+
+  /* Wochentage */
+  const byWd=WD.map((l,i)=>{const rs=tracked.filter(r=>wdIndex(r.key)===i);return {key:'wd'+i,label:l,n:rs.length,value:Math.round(avgF(rs.map(r=>r.totals.calories))),ref:rs.length?Math.round(avgF(rs.map(r=>r.budget))):undefined,over:rs.length>0&&avgF(rs.map(r=>r.totals.calories))>avgF(rs.map(r=>r.budget)),overN:rs.filter(r=>r.totals.calories>r.budget).length};});
+  const wdRef=Math.round(avgF(tracked.map(r=>r.budget)));
+  const wdData=byWd.map(d=>({...d,ref:wdRef}));
+
+  /* Trainingstag vs. Ruhetag */
+  const split=[true,false].map(tr=>{const rs=tracked.filter(r=>isTrainingDay(days[r.key])===tr);return {training:tr,n:rs.length,kcal:Math.round(avgF(rs.map(r=>r.totals.calories))),budget:Math.round(avgF(rs.map(r=>r.budget))),protein:Math.round(avgF(rs.map(r=>r.totals.protein))),carbs:Math.round(avgF(rs.map(r=>r.totals.carbs))),fat:Math.round(avgF(rs.map(r=>r.totals.fat))),within:rs.filter(r=>r.totals.calories<=r.budget).length};});
+
+  /* Training im Zeitraum */
+  const exAll=rows.flatMap(r=>((days[r.key]&&days[r.key].exercises)||[]).map(e=>({...e,key:r.key})));
+  const exTrain=exAll.filter(countsAsTraining);
+  const exMin=exAll.reduce((a,e)=>a+(+e.durationMin||0),0), exKcal=exAll.reduce((a,e)=>a+(+e.calories||0),0), exVol=exAll.reduce((a,e)=>a+(+e.volumeKg||0),0);
+  const exDays=new Set(exTrain.map(e=>e.key)).size;
+  const byType=Object.keys(EX_TYPES).map(t=>{const xs=exAll.filter(e=>exType(e)===t);return {type:t,n:xs.length,min:xs.reduce((a,e)=>a+(+e.durationMin||0),0)};}).filter(x=>x.n>0);
+  const typeMax=Math.max(...byType.map(x=>x.min),1);
+  let weekStreak=0; {const curHas=w=>{for(let i=0;i<7;i++){const k=addDays(w,i);if(k>today)break;const d=days[k];if(d&&(d.exercises||[]).some(countsAsTraining))return true;}return false;}; let w=getMonday(today); if(!curHas(w))w=addDays(w,-7); for(let i=0;i<104;i++){if(curHas(w)){weekStreak++;w=addDays(w,-7);}else break;}}
+  const weeksInRange=Math.max(1,range/7);
+
+  /* Eiweiß pro kg */
+  const gkg=+profile.weight>0?Math.round(avgTotals.protein/profile.weight*100)/100:null;
+
+  /* Top-Lebensmittel */
+  const foodMap={}; tracked.forEach(r=>{(days[r.key].foods||[]).forEach(f=>{const k=(f.name||'').trim().toLowerCase();if(!k)return;const o=foodMap[k]||(foodMap[k]={name:f.name.trim(),count:0,kcal:0});o.count++;o.kcal+=+f.calories||0;});});
+  const foodList=Object.values(foodMap); const topCount=[...foodList].sort((a,b)=>b.count-a.count||b.kcal-a.kcal).slice(0,6); const topKcal=[...foodList].sort((a,b)=>b.kcal-a.kcal).slice(0,6);
+  const totalKcalRange=tracked.reduce((a,r)=>a+r.totals.calories,0)||1;
+
 
   const shortDate=k=>{const[y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'numeric'});};
   const weeklyKg=Math.round((avgDev*7/KCAL_PER_KG)*100)/100;
@@ -1252,7 +1548,7 @@ function Stats({state,setDate,goToToday}){
         <div className="seg">{[7,14,30,90].map(r=>(<button key={r} className={range===r?'on':''} onClick={()=>setRange(r)}>{r} T</button>))}</div></header>
 
       <div className="tiles">
-        <Stat label="Ø Kalorien" value={avgTotals.calories} sub="kcal/Tag"/>
+        <Stat label="Ø Kalorien" value={Math.round(avgTotals.calories)} sub="kcal/Tag"/>
         <Stat label="Ø Abweichung" value={(avgDev>0?'+':'')+avgDev} sub="kcal/Tag"/>
         <Stat label="Im Budget" value={withinBudget+' / '+(tracked.length||0)}/>
         <Stat label="Erfasste Tage" value={tracked.length+' / '+range}/>
@@ -1263,11 +1559,11 @@ function Stats({state,setDate,goToToday}){
 
       <section className="card">
         <div className="section-head"><h3 className="card-title">Zeitverlauf</h3>
-          {tracked.length>0 && <div className="kpi"><span className="kpi-big" style={{color:METRIC_COLOR[metric]}}>{mAvg}</span><span className="kpi-unit">{mInfo.unit.trim()} Ø</span>{present.length>=4 && <span className={'trend '+(trend>0?'up':trend<0?'down':'flat')}>{trend>0?<><Icon name="trending_up"/> steigend</>:trend<0?<><Icon name="trending_down"/> fallend</>:<><Icon name="trending_flat"/> stabil</>}</span>}</div>}
+          {tracked.length>0 && <div className="kpi"><span className="kpi-big" style={{color:METRIC_COLOR[metric]}}>{metric==='calories'?Math.round(mAvg):mAvg}</span><span className="kpi-unit">{mInfo.unit.trim()} Ø</span>{present.length>=4 && <span className={'trend '+(trend>0?'up':trend<0?'down':'flat')}>{trend>0?<><Icon name="trending_up"/> steigend</>:trend<0?<><Icon name="trending_down"/> fallend</>:<><Icon name="trending_flat"/> stabil</>}</span>}</div>}
         </div>
         <div className="metric-chips">{METRICS.map(m=>(<button key={m.id} className={'metric-chip'+(metric===m.id?' on':'')} onClick={()=>setMetric(m.id)}>{m.label}</button>))}</div>
-        <DayBars data={chartData} unit={mInfo.unit} color={METRIC_COLOR[metric]}/>
-        <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> Ziel/Budget</span><span><i className="sw danger"/> über Ziel</span></div>
+        <AreaChart data={chartData.map((d,i)=>({...d,value:rows[i].has?d.value:null}))} unit={mInfo.unit} color={METRIC_COLOR[metric]}/>
+        <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> Ziel/Budget</span><span><i className="sw danger"/> über Ziel</span>{range>=14&&<span><i className="sw avg"/> 7-Tage-Schnitt</span>}</div>
       </section>
 
       <section className="card">
@@ -1313,9 +1609,89 @@ function Stats({state,setDate,goToToday}){
         <h3 className="card-title">Ø Kalorien nach Mahlzeit</h3>
         {mealAvg.map(m=>(
           <div className="macro" key={m.meal}>
-            <div className="macro-head"><span className="macro-label">{MEALS[m.meal].icon} {MEALS[m.meal].label}</span><span className="macro-num">{m.kcal} kcal</span></div>
+            <div className="macro-head"><span className="macro-label"><Icon name={MEALS[m.meal].icon}/> {MEALS[m.meal].label}</span><span className="macro-num">{Math.round(m.kcal)} kcal</span></div>
             <div className="bar"><div className="bar-fill" style={{width:(m.kcal/mealMax)*100+'%',background:'var(--data)'}}/></div>
           </div>))}
+      </section>
+
+      <WeeklyReportCard state={state} setState={setState} cloud={cloud} notify={notify}/>
+
+      <section className="card">
+        <h3 className="card-title"><Icon name="schedule"/> Essenszeiten</h3>
+        {timeDays.length===0 ? <p className="empty" style={{margin:0}}>Noch keine Einträge mit Uhrzeit im Zeitraum. Uhrzeiten kommen aus manueller Eingabe, KI-Erfassung oder der Import-Spalte „Uhrzeit“.</p> : (<>
+          <div className="tiles" style={{marginBottom:14}}>
+            <Stat label="Ø Essensfenster" value={fmtDur(tAvg.window)}/>
+            <Stat label="Ø Nachtfasten" value={tAvg.fastN?fmtDur(tAvg.fast):'–'} sub={tAvg.fastN?tAvg.fastN+' Nächte':'braucht zwei Tage in Folge'}/>
+            <Stat label="Ø erste Mahlzeit" value={fmtClock(tAvg.first)}/>
+            <Stat label="Ø letzte Mahlzeit" value={fmtClock(tAvg.last)}/>
+            <Stat label="Nach 20 Uhr" value={Math.round(tAvg.late*100)+' %'} sub="der Kalorien"/>
+            <Stat label="Ø Mahlzeiten" value={(Math.round(tAvg.count*10)/10).toLocaleString('de-DE')} sub={tAvg.gap?'Abstand ~'+fmtDur(tAvg.gap):''}/>
+          </div>
+          <div className="section-label" style={{marginTop:0}}>Ø Kalorien nach Tagesstunde</div>
+          <DayBars data={hourData} unit=" kcal" color="var(--accent)"/>
+          <p className="muted small" style={{margin:'8px 0 0'}}>{timeDays.length} von {tracked.length} Tagen mit Uhrzeiten.</p>
+        </>)}
+      </section>
+
+      <section className="card">
+        <h3 className="card-title"><Icon name="view_week"/> Wochen</h3>
+        <table className="tbl"><thead><tr><th>Woche</th><th>Tage</th><th>Ø kcal</th><th>Im Budget</th><th>Ø Eiweiß</th><th>Training</th><th></th></tr></thead><tbody>
+          {weeks.map((w,i)=>{const prev=weeks[i-1];const diff=prev&&prev.tracked&&w.tracked?w.kcal-prev.kcal:null;return (<tr key={w.mon} className={w.tracked?'':'muted'}>
+            <td><strong>{w.label}</strong><span className="muted small"> ab {w.from}</span></td><td>{w.tracked}</td><td>{w.tracked?w.kcal:'–'}</td><td>{w.tracked?w.within+' / '+w.tracked:'–'}</td><td>{w.tracked?w.protein+' g':'–'}</td><td>{w.training}×</td>
+            <td>{diff!=null&&<span className={'trend '+(diff<-50?'up':diff>50?'down':'flat')}>{diff>0?'+':''}{diff}</span>}</td></tr>);})}
+        </tbody></table>
+        <p className="muted small" style={{margin:'8px 0 0'}}>Differenz = Ø kcal zur Vorwoche; grün heißt weniger.</p>
+      </section>
+
+      <div className="grid2">
+        <section className="card">
+          <h3 className="card-title"><Icon name="date_range"/> Wochentage</h3>
+          {tracked.length===0 ? <p className="empty" style={{margin:0}}>Keine Daten.</p> : (<>
+            <DayBars data={wdData} unit=" kcal" color="var(--data)" refLabel="Ø Budget"/>
+            <div className="wd-grid">{byWd.map(d=>(<div key={d.key} className={d.n&&d.overN/d.n>=0.5?'over':''}><b>{d.label}</b><span>{d.n?Math.round(d.overN/d.n*100)+' % über':'–'}</span></div>))}</div>
+          </>)}
+        </section>
+        <section className="card">
+          <h3 className="card-title"><Icon name="fitness_center"/> Trainingstag vs. Ruhetag</h3>
+          <table className="tbl"><thead><tr><th></th><th>Training</th><th>Ruhetag</th></tr></thead><tbody>
+            <tr><td>Tage</td>{split.map(x=><td key={+x.training}>{x.n}</td>)}</tr>
+            <tr><td>Ø kcal / Budget</td>{split.map(x=><td key={+x.training}>{x.n?x.kcal+' / '+x.budget:'–'}</td>)}</tr>
+            <tr><td>Im Budget</td>{split.map(x=><td key={+x.training}>{x.n?x.within+' / '+x.n:'–'}</td>)}</tr>
+            <tr><td>Ø Eiweiß</td>{split.map(x=><td key={+x.training}>{x.n?x.protein+' g':'–'}</td>)}</tr>
+            <tr><td>Ø KH</td>{split.map(x=><td key={+x.training}>{x.n?x.carbs+' g':'–'}</td>)}</tr>
+            <tr><td>Ø Fett</td>{split.map(x=><td key={+x.training}>{x.n?x.fat+' g':'–'}</td>)}</tr>
+          </tbody></table>
+          {gkg!=null && tracked.length>0 && <p className="muted small" style={{margin:'10px 0 0'}}>Ø Eiweiß <strong>{gkg.toLocaleString('de-DE')} g/kg</strong> Körpergewicht ({profile.weight} kg) · Richtwert 1,6–2,2 g/kg bei Krafttraining.</p>}
+        </section>
+      </div>
+
+      <section className="card">
+        <h3 className="card-title"><Icon name="fitness_center"/> Training</h3>
+        {exAll.length===0 ? <p className="empty" style={{margin:0}}>Kein Training im Zeitraum erfasst – auf „Heute“ unter Training eintragen oder aus Hevy übernehmen.</p> : (<>
+          <div className="tiles" style={{marginBottom:14}}>
+            <Stat label="Einheiten" value={exAll.length} sub={exDays+' Trainingstage'}/>
+            <Stat label="Ø pro Woche" value={(Math.round(exAll.length/weeksInRange*10)/10).toLocaleString('de-DE')} sub="Einheiten"/>
+            <Stat label="Minuten" value={exMin} sub={'Ø '+Math.round(exMin/weeksInRange)+' / Woche'}/>
+            <Stat label="Verbrannt" value={Math.round(exKcal)} sub="kcal gesamt"/>
+            {exVol>0 && <Stat label="Volumen" value={(Math.round(exVol/1000*10)/10).toLocaleString('de-DE')+' t'} sub="Hevy, Sätze × Wdh. × kg"/>}
+            <Stat label={<><Icon name="local_fire_department"/> Wochen-Serie</>} value={weekStreak} sub={weekStreak===1?'Woche mit Training':'Wochen in Folge'}/>
+          </div>
+          {byType.map(x=>(<div className="macro" key={x.type}>
+            <div className="macro-head"><span className="macro-label"><Icon name={EX_TYPES[x.type].icon}/> {EX_TYPES[x.type].label}</span><span className="macro-num">{x.n}× · {x.min} min</span></div>
+            <div className="bar"><div className="bar-fill" style={{width:(x.min/typeMax)*100+'%',background:'var(--accent)'}}/></div>
+          </div>))}
+        </>)}
+      </section>
+
+      <section className="card">
+        <h3 className="card-title"><Icon name="restaurant_menu"/> Top-Lebensmittel</h3>
+        {foodList.length===0 ? <p className="empty" style={{margin:0}}>Keine Daten.</p> : (
+        <div className="grid2">
+          <div><div className="section-label" style={{marginTop:0}}>Am häufigsten</div>
+            {topCount.map(f=>(<div className="top-row" key={f.name}><span className="ellipsis">{f.name}</span><span className="muted">{f.count}×</span></div>))}</div>
+          <div><div className="section-label" style={{marginTop:0}}>Meiste Kalorien</div>
+            {topKcal.map(f=>(<div className="top-row" key={f.name}><span className="ellipsis">{f.name}</span><span className="muted">{Math.round(f.kcal)} kcal · {Math.round(f.kcal/totalKcalRange*100)} %</span></div>))}</div>
+        </div>)}
       </section>
     </div>
   );
@@ -1551,6 +1927,8 @@ function App(){
   const [importOpen,setImportOpen]=useState(null); // null | 'auto' | 'ai' | 'table'
   const [helpOpen,setHelpOpen]=useState(false);
   const [manualSignal,setManualSignal]=useState(0);
+  const [updateReg,setUpdateReg]=useState(null);
+  useEffect(()=>{const on=e=>setUpdateReg(e.detail);window.addEventListener('essen:update',on);return ()=>window.removeEventListener('essen:update',on);},[]);
   const [toast,setToast]=useState(null);
   useEffect(()=>{save(state);},[state]);
   const toastT=useRef(null);
@@ -1613,8 +1991,8 @@ function App(){
     <div className="app">
       <main className="content">
         {tab==='dashboard' && <Dashboard state={state} setState={setState} date={date} setDate={setDate} openImport={openImport}/>}
-        {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={openImport} notify={notify} manualSignal={manualSignal}/>}
-        {tab==='stats' && <Stats state={state} setDate={setDate} goToToday={()=>setTab('dashboard')}/>}
+        {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={openImport} notify={notify} manualSignal={manualSignal} cloud={cloud}/>}
+        {tab==='stats' && <Stats state={state} setState={setState} setDate={setDate} goToToday={()=>setTab('today')} cloud={cloud} notify={notify}/>}
         {tab==='archive' && <ArchivePage state={state} setState={setState} goDay={d=>{setDate(d);setTab('today');}}/>}
         {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud}/>}
       </main>
@@ -1638,11 +2016,21 @@ function App(){
       </nav>
       {importOpen && <ImportPanel state={state} setState={setState} setDate={setDate} onClose={()=>setImportOpen(null)} cloud={cloud} date={date} notify={notify} initialMode={importOpen}/>}
       {helpOpen && <HelpOverlay onClose={()=>setHelpOpen(false)}/>}
+      {updateReg && <button className="update-bar" onClick={()=>{try{updateReg.waiting&&updateReg.waiting.postMessage('skipWaiting');}catch(e){}setUpdateReg(null);}}><Icon name="system_update_alt"/> Neue Version verfügbar – jetzt laden</button>}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+/* Installierbar & offline: Service Worker nur über http(s), nicht bei Doppelklick auf die Datei. */
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      reg.addEventListener('updatefound',()=>{const nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)window.dispatchEvent(new CustomEvent('essen:update',{detail:reg}));});});
+    }).catch(()=>{});
+    let reloading=false; navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
+  });
+}
 </script>
 </body>
 </html>

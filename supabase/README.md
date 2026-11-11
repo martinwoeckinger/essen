@@ -45,6 +45,23 @@ supabase secrets set ANTHROPIC_API_KEY=sk-ant-DEIN-KEY
 supabase functions deploy nutrition
 ```
 
+```bash
+supabase functions deploy report
+```
+
+```bash
+supabase functions deploy hevy
+```
+
+`report` schreibt den Wochenbericht (gleicher Anthropic-Key). `hevy` holt
+Workouts aus der offiziellen Hevy-API und braucht zusätzlich das Secret
+`HEVY_API_KEY` (Hevy-App → Settings → Developer → API Key; nach Hevys
+Angaben nur mit Hevy Pro verfügbar):
+
+```bash
+supabase secrets set HEVY_API_KEY=DEIN-HEVY-KEY
+```
+
 Der Claude-Key liegt danach nur als Secret auf Supabase (alternativ im
 Dashboard unter **Edge Functions → Secrets** eintragen). Die Function
 akzeptiert ausschließlich Anfragen angemeldeter Nutzer (sie prüft das JWT

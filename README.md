@@ -53,6 +53,17 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
   Läuft über eine Supabase Edge Function, der Claude-Key bleibt serverseitig.
 - **Cloud-Sync** – Login per E-Mail (Passwort oder Magic-Link); der neueste
   Stand gewinnt, lokal bleibt ein Offline-Cache. Hell/Dunkel bleibt pro Gerät.
+- **Essenszeiten** – Uhrzeit pro Eintrag (manuell, KI, Import-Spalte). Daraus:
+  Zeitleiste des Tages, Essensfenster, Nachtfasten, Anteil nach 20 Uhr,
+  Kalorien nach Tagesstunde.
+- **Training** – Einheiten mit Typ (Kraft/Ausdauer/Mobility), Dauer, Intensität,
+  Uhrzeit und Notiz; kcal werden sonst per MET-Richtwert geschätzt. Ein Eintrag
+  setzt den Tag automatisch als Trainingstag. **Hevy-Import** der letzten 30
+  Tage mit Übungen, Sätzen und Volumen (eigener API-Key als Supabase-Secret).
+- **Wochenbericht von Claude** – kurze Einordnung der Woche plus zwei konkrete
+  Hinweise, gespeichert pro Kalenderwoche.
+- **Installierbar (PWA)** – Manifest, Icons und Service Worker; die App startet
+  auch offline, Updates werden per Hinweisleiste angeboten.
 - **Erfassung per Copy & Paste** – Tabelle (Tab- oder `|`-getrennt) einfügen;
   **Datum und Mahlzeit werden automatisch zugeordnet**. Mit Vorschau,
   Duplikat-Warnung, „rückgängig" und optionalem Leeren der betroffenen Tage.
@@ -65,10 +76,12 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
 - **Erweiterte Nährwerte** – kcal, Eiweiß/KH/Fett **plus** Zucker, gesättigte
   Fettsäuren, Ballaststoffe und Salz, mit Ziel-/Limit-Balken und Makro-Donut.
 - **Archiv** – alle Tage nach Monat, durchsuchbar; Export zurück ins Tab-Format.
-- **Analyse** – umschaltbarer **Zeitverlauf** (Kalorien/Makros/Ballaststoffe/
-  Zucker/Salz) mit 7-Tage-Schnitt, **Kalender-Heatmap**, **Prognose**
-  (geschätzte kg-Veränderung aus der Kalorienbilanz), Verteilung nach Mahlzeit
-  und Tracking-Treue (Budget-Treue, Serie).
+- **Analyse** – **Zeitverlauf** als Flächendiagramm mit Hover-Werten
+  (Kalorien/Makros/Ballaststoffe/Zucker/Salz, 7-Tage-Schnitt),
+  **Kalender-Heatmap**, **Prognose** (geschätzte kg-Veränderung), Verteilung
+  nach Mahlzeit, **Wochenübersicht**, **Wochentagsmuster**, **Trainingstag vs.
+  Ruhetag**, Eiweiß pro kg Körpergewicht, **Top-Lebensmittel**, Essenszeiten,
+  Trainingsvolumen und Wochen-Serie.
 - **Kalorienziel manuell** – zwei feste Tageswerte im Profil eintragen
   (**Trainingstag** / **kein Trainingstag**), nichts wird berechnet. Pro Tag
   wird auf „Heute" bzw. im Dashboard markiert, ob es ein Trainingstag ist.
@@ -84,8 +97,10 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
 Eine Zeile pro Lebensmittel, Spalten per **Tab** (oder `|`) getrennt:
 
 ```
-Datum  Mahlzeit  Nahrungsmittel  Menge  kcal  Eiweiß  KH  Zucker  Fett  ges.FS  Ballaststoffe  Salz  Notiz
+Datum  Mahlzeit  Nahrungsmittel  Menge  kcal  Eiweiß  KH  Zucker  Fett  ges.FS  Ballaststoffe  Salz  Notiz  Uhrzeit
 ```
+
+Die letzte Spalte „Uhrzeit“ (HH:MM) ist optional.
 
 Beispiel (deutsche Kommazahlen und Notizen mit Kommas sind erlaubt):
 
