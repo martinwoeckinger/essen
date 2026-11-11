@@ -54,9 +54,12 @@ supabase functions deploy hevy
 ```
 
 `report` schreibt den Wochenbericht (gleicher Anthropic-Key). `hevy` holt
-Workouts aus der offiziellen Hevy-API und braucht zusätzlich das Secret
+Workouts live aus der offiziellen Hevy-API und braucht dafür das Secret
 `HEVY_API_KEY` (Hevy-App → Settings → Developer → API Key; nach Hevys
-Angaben nur mit Hevy Pro verfügbar):
+Angaben nur mit Hevy Pro verfügbar). **Optional:** Ohne Key liest die App die
+Workouts aus der Tabelle `hevy_sync_workouts` ([`hevy.sql`](hevy.sql)), die der
+geplante Sync-Task über den Hevy-Connector befüllt (siehe
+[`garmin-sync.md`](garmin-sync.md)).
 
 ```bash
 supabase secrets set HEVY_API_KEY=DEIN-HEVY-KEY
