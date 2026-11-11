@@ -2,7 +2,7 @@
    - Navigation/index.html: Netz zuerst, Cache als Fallback (Updates kommen sofort an).
    - Eigene Dateien und CDN-Skripte/Fonts: Cache zuerst, im Hintergrund aktualisieren.
    - Supabase-Aufrufe werden nie gecacht. */
-const CACHE = 'essen-shell-v1';
+const CACHE = 'essen-shell-v2';
 const SHELL = ['./', './index.html', './config.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 const CDN_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 

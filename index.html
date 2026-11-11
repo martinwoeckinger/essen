@@ -91,7 +91,7 @@ html,body,#root{height:100%;margin:0}
   .tab.active .tab-icon .msym{ font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24; }
   .theme-toggle{ @apply text-onvar; }
   .brand{ @apply hidden; }
-  .brand-icon{ font-size:24px;color:var(--accent); }
+  .brand-icon{ @apply inline-flex; } .brand-icon svg{ border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.15); }
   .primary{ @apply inline-flex items-center justify-center gap-1.5 bg-primary text-onprimary border-0 rounded-full font-semibold cursor-pointer transition; padding:12px 24px;box-shadow:0 1px 2px rgba(0,0,0,.16); }
   .primary .msym{ font-size:19px; }
   .erfassen-btn{ @apply flex items-center justify-center gap-2 w-full bg-primary text-onprimary border-0 rounded-[20px] font-bold cursor-pointer transition; padding:16px;font-size:16px;box-shadow:0 6px 20px rgba(224,94,0,.30); }
@@ -2094,7 +2094,7 @@ function App(){
         {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud}/>}
       </main>
       <nav className="tabbar">
-        <div className="brand"><span className="brand-icon"><Icon name="nutrition"/></span><span className="brand-name">Essen</span></div>
+        <div className="brand"><span className="brand-icon"><svg viewBox="0 0 512 512" width="28" height="28" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#17171a"/><rect x="120" y="120" width="64" height="272" rx="32" fill="#f97316"/><rect x="120" y="120" width="272" height="64" rx="32" fill="#34d399"/><rect x="120" y="224" width="220" height="64" rx="32" fill="#38bdf8"/><rect x="120" y="328" width="272" height="64" rx="32" fill="#c084fc"/></svg></span><span className="brand-name">Essen</span></div>
         {TABS.map((t,i)=>(
         <button key={t.id} className={'tab'+(tab===t.id?' active':'')+(t.desktop?' desk-only':'')} title={t.label+' ('+(i+1)+')'} onClick={()=>setTab(t.id)}>
           <span className="tab-icon"><Icon name={t.icon}/></span><span className="tab-label">{t.label}</span></button>))}
