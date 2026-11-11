@@ -428,8 +428,11 @@ const EX_TYPES={strength:{label:'Kraft',icon:'fitness_center'},cardio:{label:'Au
 const EX_INT={low:'leicht',mid:'mittel',high:'hart'};
 const exType = e => EX_TYPES[e&&e.type]?e.type:'other';
 const countsAsTraining = e => exType(e)!=='mobility';
-/* Grobe kcal-Schätzung über MET (Kraft 5, Ausdauer 8, Mobility 2.5) × kg × Stunden. */
-const estimateKcal=(type,durationMin,weight)=>{const met={strength:5,cardio:8,mobility:2.5,other:5}[type]||5;return Math.round(met*(+weight||75)*((+durationMin||0)/60));};
+/* Grobe kcal-Schätzung über MET × kg × Stunden. Kraft 3,5 (nach gemessenen Werten des Nutzers: ca. 200–300 kcal pro Einheit), Ausdauer 8, Mobility 2,5. */
+const estimateKcal=(type,durationMin,weight)=>{const met={strength:3.5,cardio:8,mobility:2.5,other:4}[type]||4;return Math.round(met*(+weight||75)*((+durationMin||0)/60));};
+/* Hevy-Krafttraining: Schätzung zusätzlich bei 300 kcal gedeckelt (Erfahrungswert aus Pulsmessungen). */
+const HEVY_KCAL_CAP=300;
+const hevyKcal=(durationMin,weight)=>Math.min(HEVY_KCAL_CAP,estimateKcal('strength',durationMin,weight));
 const defaultMeal=()=>{const h=new Date().getHours();return h<11?'breakfast':h<15?'lunch':h<18?'snack':'dinner';};
 
 /* ---------- Berechnung ---------- */
@@ -1214,7 +1217,7 @@ function HevyOverlay({state,setState,onClose,notify}){
     const weight=state.profile.weight; let n=0;
     chosen.forEach(w=>{const d=new Date(w.start);const date=todayKey(d);const dur=w.durationMin||0;
       const note=['Hevy',w.exerciseCount+' Übungen',w.setCount+' Sätze',w.volumeKg?('Volumen '+w.volumeKg.toLocaleString('de-DE')+' kg'):null].filter(Boolean).join(' · ');
-      addExTo(setState,date,{name:w.title,type:'strength',durationMin:dur||undefined,calories:estimateKcal('strength',dur,weight),note,time:w.start,timeSet:true,source:'hevy',hevyId:w.id,volumeKg:w.volumeKg,sets:w.setCount,exercises:(w.exercises||[]).map(x=>x.title)});n++;});
+      addExTo(setState,date,{name:w.title,type:'strength',durationMin:dur||undefined,calories:hevyKcal(dur,weight),note:note+' · kcal geschätzt',time:w.start,timeSet:true,source:'hevy',hevyId:w.id,volumeKg:w.volumeKg,sets:w.setCount,exercises:(w.exercises||[]).map(x=>x.title)});n++;});
     if(notify)notify(n+' Workout'+(n===1?'':'s')+' aus Hevy übernommen'); onClose();
   }
   return (<Overlay title="Aus Hevy importieren" onClose={onClose}>
@@ -1230,7 +1233,7 @@ function HevyOverlay({state,setState,onClose,notify}){
             <span className="muted small ellipsis">{(w.exercises||[]).map(x=>x.title).join(', ')}</span></span>
           {done&&<span className="hevy-tag">importiert</span>}
         </label>);})}
-      {!busy && !err && list.length>0 && <div className="import-actions"><button className="primary" disabled={!chosen.length} onClick={doImport}><Icon name="download"/> {chosen.length} importieren</button><span className="muted small" style={{alignSelf:'center'}}>Kalorien werden geschätzt (MET 5 × Gewicht × Dauer) und sind nachträglich änderbar.</span></div>}
+      {!busy && !err && list.length>0 && <div className="import-actions"><button className="primary" disabled={!chosen.length} onClick={doImport}><Icon name="download"/> {chosen.length} importieren</button><span className="muted small" style={{alignSelf:'center'}}>Kalorien werden geschätzt (MET 3,5 × Gewicht × Dauer, max. 300 kcal) und sind nachträglich änderbar.</span></div>}
     </div>
   </Overlay>);
 }
