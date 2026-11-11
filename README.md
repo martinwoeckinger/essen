@@ -60,8 +60,13 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
   Uhrzeit und Notiz; kcal werden sonst per MET-Richtwert geschätzt. Ein Eintrag
   setzt den Tag automatisch als Trainingstag. **Hevy-Import** der letzten 30
   Tage mit Übungen, Sätzen und Volumen (eigener API-Key als Supabase-Secret).
+- **Garmin** – Tagesdaten (Verbrauch, aktive kcal, Schritte, Ruhepuls, Schlaf,
+  Body Battery, Stress) und Aktivitäten aus Garmin Connect, mit Bilanz
+  „gegessen − Verbrauch“ pro Tag und im Zeitraum. Aktivitäten lassen sich als
+  Trainingseinheit übernehmen. Befüllt über einen Garmin-Sync, siehe
+  [`supabase/garmin-sync.md`](supabase/garmin-sync.md).
 - **Wochenbericht von Claude** – kurze Einordnung der Woche plus zwei konkrete
-  Hinweise, gespeichert pro Kalenderwoche.
+  Hinweise, gespeichert pro Kalenderwoche; mit Garmin-Werten, wenn vorhanden.
 - **Installierbar (PWA)** – Manifest, Icons und Service Worker; die App startet
   auch offline, Updates werden per Hinweisleiste angeboten.
 - **Erfassung per Copy & Paste** – Tabelle (Tab- oder `|`-getrennt) einfügen;
