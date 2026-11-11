@@ -257,6 +257,11 @@ html,body,#root{height:100%;margin:0}
   .wd-grid div{ @apply flex flex-col; font-size:11px;color:var(--muted);padding:6px 2px;border-radius:8px; } .wd-grid b{ font-size:12px;color:var(--text); } .wd-grid div.over{ background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger); }
   .top-row{ @apply flex justify-between gap-3; font-size:13px;padding:6px 0;border-bottom:1px solid var(--line); } .top-row:last-child{ border-bottom:none; }
   .report{ font-size:14px;line-height:1.55; } .report p{ margin:0 0 8px; } .report li{ margin:0 0 6px 18px; }
+  .ex-icon{ font-size:18px;color:var(--accent);vertical-align:-3px; }
+  .hevy-row{ @apply flex items-start gap-3 cursor-pointer; padding:10px 0;border-top:1px solid var(--line); } .hevy-row:first-of-type{ border-top:none; }
+  .hevy-row input{ width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none; }
+  .hevy-main{ @apply flex flex-col gap-0.5; min-width:0;flex:1; } .hevy-title{ font-weight:700; }
+  .hevy-row.done{ opacity:.55; } .hevy-tag{ @apply bg-s3 text-onvar rounded-full; font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap; }
   .preview-meal{ margin-top:8px; }
   .preview-meal-head{ font-size:13px;font-weight:700;color:var(--accent2);margin:6px 0 2px; }
   .preview-row{ @apply flex justify-between gap-2.5; font-size:13px;padding:3px 0; }
@@ -415,6 +420,13 @@ const MEALS={
   snack:{label:'Snack',icon:'cookie',hour:16,order:3},
 };
 const MEAL_ORDER=Object.keys(MEALS).sort((a,b)=>MEALS[a].order-MEALS[b].order);
+/* ---------- Training ---------- */
+const EX_TYPES={strength:{label:'Kraft',icon:'fitness_center'},cardio:{label:'Ausdauer',icon:'directions_run'},mobility:{label:'Mobility',icon:'self_improvement'},other:{label:'Sonstiges',icon:'sports'}};
+const EX_INT={low:'leicht',mid:'mittel',high:'hart'};
+const exType = e => EX_TYPES[e&&e.type]?e.type:'other';
+const countsAsTraining = e => exType(e)!=='mobility';
+/* Grobe kcal-Schätzung über MET (Kraft 5, Ausdauer 8, Mobility 2.5) × kg × Stunden. */
+const estimateKcal=(type,durationMin,weight)=>{const met={strength:5,cardio:8,mobility:2.5,other:5}[type]||5;return Math.round(met*(+weight||75)*((+durationMin||0)/60));};
 const defaultMeal=()=>{const h=new Date().getHours();return h<11?'breakfast':h<15?'lunch':h<18?'snack':'dinner';};
 
 /* ---------- Berechnung ---------- */
@@ -619,6 +631,12 @@ async function cloudReport(payload){
   if(data&&data.error)throw new Error(data.error);
   return data||{};
 }
+async function cloudHevy(since){
+  const {data,error}=await sb().functions.invoke('hevy',{body:{since}});
+  if(error){let msg=error.message||'Fehler beim Hevy-Import';try{const ctx=error.context;if(ctx&&typeof ctx.json==='function'){const j=await ctx.json();if(j&&j.error)msg=j.error;}}catch(e){}throw new Error(msg);}
+  if(data&&data.error)throw new Error(data.error);
+  return data||{};
+}
 const cloudErrMsg = e => { const m=(e&&e.message)||String(e||''); return /Failed to fetch|NetworkError|Load failed/i.test(m)?'Keine Verbindung zur Cloud (offline?)':m; };
 function useCloud(state,rawSet,notify){
   const client=sb(); const configured=!!client;
@@ -707,8 +725,12 @@ function DayTypeSeg({state,setState,date}){
   </div>);
 }
 function addExTo(setState,date,ex){
-  setState(s=>{const d=s.days[date]||{date,foods:[],exercises:[]};return{...s,days:{...s.days,[date]:{...d,exercises:[...d.exercises,{...ex,id:uid(),time:new Date().toISOString()}]}}};});
+  setState(s=>{const d=s.days[date]||{date,foods:[],exercises:[]};const entry={...ex,id:uid(),time:ex.time||new Date().toISOString()};return{...s,days:{...s.days,[date]:{...d,training:d.training||countsAsTraining(entry),exercises:[...d.exercises,entry]}}};});
 }
+function updateEx(setState,date,id,patch){
+  setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,exercises:d.exercises.map(e=>e.id===id?{...e,...patch}:e)}}};});
+}
+const allHevyIds = state => {const ids=new Set();Object.values(state.days||{}).forEach(d=>(d.exercises||[]).forEach(e=>{if(e.hevyId)ids.add(e.hevyId);}));return ids;};
 function importEntries(setState,rows,replace){
   const seq={};
   const built=rows.map(r=>{const i=seq[r.date]=(seq[r.date]||0)+1;
@@ -846,13 +868,16 @@ function Heatmap({days,goal,onPick,weeks=9}){
   </div>);
 }
 const Stat=({label,value,sub})=>(<div className="stat"><div className="stat-value">{value}</div><div className="stat-label">{label}</div>{sub&&<div className="stat-sub">{sub}</div>}</div>);
-const Overlay=({title,onClose,children})=>(
+function Overlay({title,onClose,children}){
+  useEffect(()=>{const k=e=>{if(e.key==='Escape'){e.stopPropagation();onClose();}};window.addEventListener('keydown',k,true);return ()=>window.removeEventListener('keydown',k,true);},[onClose]);
+  return (
   <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className="overlay-card">
       <div className="overlay-head"><h2>{title}</h2><button className="chip" onClick={onClose}><Icon name="close"/> Schließen</button></div>
       <div className="overlay-body">{children}</div>
     </div>
   </div>);
+}
 
 /* ---------- Tages-Übersicht für Claude ---------- */
 function buildDaySummary(state,date){
@@ -881,7 +906,7 @@ function buildDaySummary(state,date){
   });
   if(day.exercises.length){
     L.push('');
-    L.push('Sport: '+day.exercises.map(e=>e.name+(e.durationMin?' '+e.durationMin+' min':'')+' (−'+Math.round(e.calories)+' kcal)').join(', '));
+    L.push('Training: '+day.exercises.map(e=>e.name+' ('+EX_TYPES[exType(e)].label+(e.durationMin?', '+e.durationMin+' min':'')+(e.intensity?', '+EX_INT[e.intensity]:'')+', −'+Math.round(e.calories)+' kcal)').join(', '));
   }
   if(!day.foods.length) L.push('\n(An diesem Tag wurde noch nichts erfasst.)');
   L.push('');
@@ -1123,20 +1148,60 @@ function FoodForm({onSubmit,initial,submitLabel,date}){
     </form>
   );
 }
-function ExerciseForm({onSubmit}){
-  const [v,setV]=useState({name:'',durationMin:'',calories:''});
-  const ch=k=>e=>setV({...v,[k]:e.target.value});
+function ExerciseForm({onSubmit,initial,submitLabel,date,weight}){
+  const day=date||todayKey();
+  const init=initial?{name:initial.name||'',type:exType(initial),durationMin:n2s(initial.durationMin),calories:n2s(initial.calories),intensity:initial.intensity||'',note:initial.note||'',time:initial.time?timeLabel(initial.time):nowHM()}:{name:'',type:'strength',durationMin:'',calories:'',intensity:'',note:'',time:day===todayKey()?nowHM():'07:00'};
+  const [v,setV]=useState(init);
+  const ch=k=>e=>setV(x=>({...x,[k]:e.target.value}));
+  const est=estimateKcal(v.type,numDe(v.durationMin),weight);
   return (
     <form className="form" onSubmit={e=>{e.preventDefault();if(!v.name.trim())return;
-      onSubmit({name:v.name.trim(),durationMin:v.durationMin?+v.durationMin:undefined,calories:+v.calories||0});}}>
-      <input placeholder="Aktivität (z.B. Joggen)" value={v.name} onChange={ch('name')} autoFocus/>
+      onSubmit({name:v.name.trim(),type:v.type,durationMin:v.durationMin?numDe(v.durationMin):undefined,calories:v.calories!==''?numDe(v.calories):est,intensity:v.intensity||undefined,note:v.note.trim()||undefined,time:isoFromHM(day,v.time)||(initial&&initial.time)||new Date().toISOString(),timeSet:!!parseHM(v.time),source:initial?(initial.source||'manual'):'manual'});}}>
+      <input placeholder="Aktivität (z.B. Krafttraining, Laufen)" value={v.name} onChange={ch('name')} autoFocus/>
       <div className="form-grid two">
-        <input inputMode="numeric" placeholder="Minuten" value={v.durationMin} onChange={ch('durationMin')}/>
-        <input inputMode="numeric" placeholder="kcal verbrannt" value={v.calories} onChange={ch('calories')}/>
+        <select value={v.type} onChange={ch('type')}>{Object.keys(EX_TYPES).map(t=><option key={t} value={t}>{EX_TYPES[t].label}</option>)}</select>
+        <input type="time" value={v.time} onChange={ch('time')} title="Beginn"/>
       </div>
-      <button type="submit" className="primary">Hinzufügen</button>
+      <div className="form-grid two">
+        <div className="num-suffix"><input inputMode="numeric" placeholder="Dauer" value={v.durationMin} onChange={ch('durationMin')}/><span>min</span></div>
+        <div className="num-suffix"><input inputMode="numeric" placeholder={est?'≈ '+est:'kcal'} value={v.calories} onChange={ch('calories')}/><span>kcal</span></div>
+      </div>
+      <div className="seg full">{Object.keys(EX_INT).map(k=>(<button type="button" key={k} className={v.intensity===k?'on':''} onClick={()=>setV(x=>({...x,intensity:x.intensity===k?'':k}))}>{EX_INT[k]}</button>))}</div>
+      <input placeholder="Notiz (optional)" value={v.note} onChange={ch('note')}/>
+      {!v.calories && est>0 && <p className="muted small" style={{margin:0}}>Ohne Angabe werden ≈ {est} kcal geschätzt (MET-Richtwert × {weight||75} kg × Dauer).</p>}
+      <button type="submit" className="primary">{submitLabel||'Hinzufügen'}</button>
     </form>
   );
+}
+/* ---------- Hevy-Import ---------- */
+function HevyOverlay({state,setState,onClose,notify}){
+  const [busy,setBusy]=useState(true),[err,setErr]=useState(null),[list,setList]=useState([]),[sel,setSel]=useState({});
+  const have=useMemo(()=>allHevyIds(state),[state.days]);
+  useEffect(()=>{let on=true;(async()=>{try{const since=new Date(Date.now()-30*86400000).toISOString();const res=await cloudHevy(since);const ws=(res.workouts||[]);if(!on)return;setList(ws);const s0={};ws.forEach(w=>{if(!have.has(w.id))s0[w.id]=true;});setSel(s0);}catch(e){if(on)setErr(cloudErrMsg(e));}finally{if(on)setBusy(false);}})();return ()=>{on=false;};},[]);
+  const chosen=list.filter(w=>sel[w.id]&&!have.has(w.id));
+  function doImport(){
+    const weight=state.profile.weight; let n=0;
+    chosen.forEach(w=>{const d=new Date(w.start);const date=todayKey(d);const dur=w.durationMin||0;
+      const note=['Hevy',w.exerciseCount+' Übungen',w.setCount+' Sätze',w.volumeKg?('Volumen '+w.volumeKg.toLocaleString('de-DE')+' kg'):null].filter(Boolean).join(' · ');
+      addExTo(setState,date,{name:w.title,type:'strength',durationMin:dur||undefined,calories:estimateKcal('strength',dur,weight),note,time:w.start,timeSet:true,source:'hevy',hevyId:w.id,volumeKg:w.volumeKg,sets:w.setCount,exercises:w.exercises.map(x=>x.title)});n++;});
+    if(notify)notify(n+' Workout'+(n===1?'':'s')+' aus Hevy übernommen'); onClose();
+  }
+  return (<Overlay title="Aus Hevy importieren" onClose={onClose}>
+    <div className="card">
+      {busy && <p className="muted small" style={{margin:0}}><Icon name="progress_activity" className="spin"/> Lade Workouts der letzten 30 Tage …</p>}
+      {err && <p className="ai-err" style={{marginTop:0}}><Icon name="error"/> {err}</p>}
+      {!busy && !err && list.length===0 && <p className="empty" style={{margin:0}}>Keine Workouts in den letzten 30 Tagen.</p>}
+      {list.map(w=>{const done=have.has(w.id);const d=new Date(w.start);return (
+        <label key={w.id} className={'hevy-row'+(done?' done':'')}>
+          <input type="checkbox" disabled={done} checked={!!sel[w.id]&&!done} onChange={e=>setSel(x=>({...x,[w.id]:e.target.checked}))}/>
+          <span className="hevy-main"><span className="hevy-title">{w.title}</span>
+            <span className="muted small">{d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} {timeLabel(w.start)}{w.durationMin?' · '+w.durationMin+' min':''} · {w.exerciseCount} Übungen · {w.setCount} Sätze{w.volumeKg?' · '+w.volumeKg.toLocaleString('de-DE')+' kg':''}</span>
+            <span className="muted small ellipsis">{w.exercises.map(x=>x.title).join(', ')}</span></span>
+          {done&&<span className="hevy-tag">importiert</span>}
+        </label>);})}
+      {!busy && !err && list.length>0 && <div className="import-actions"><button className="primary" disabled={!chosen.length} onClick={doImport}><Icon name="download"/> {chosen.length} importieren</button><span className="muted small" style={{alignSelf:'center'}}>Kalorien werden geschätzt (MET 5 × Gewicht × Dauer) und sind nachträglich änderbar.</span></div>}
+    </div>
+  </Overlay>);
 }
 
 /* Tages-Zusammenfassung: Bausteine für Dashboard (alle Größen) und Heute-Seitenpanel (Desktop). */
@@ -1253,9 +1318,9 @@ function Dashboard({state,setState,date,setDate,openImport}){
   );
 }
 
-function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
+function Today({state,setState,date,setDate,openImport,notify,manualSignal,cloud}){
   const day=state.days[date]||{date,foods:[],exercises:[]};
-  const [openF,setOpenF]=useState(false),[openE,setOpenE]=useState(false),[editId,setEditId]=useState(null),[share,setShare]=useState(false);
+  const [openF,setOpenF]=useState(false),[openE,setOpenE]=useState(false),[editId,setEditId]=useState(null),[editEx,setEditEx]=useState(null),[share,setShare]=useState(false),[hevy,setHevy]=useState(false);
   useEffect(()=>{if(manualSignal){setEditId(null);setOpenF(true);}},[manualSignal]);
   const rmFood=id=>setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,foods:d.foods.filter(x=>x.id!==id)}}};});
   const rmEx=id=>setState(s=>{const d=s.days[date];if(!d)return s;return{...s,days:{...s.days,[date]:{...d,exercises:d.exercises.filter(x=>x.id!==id)}}};});
@@ -1315,18 +1380,26 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal}){
       </section>
 
       <section className="card">
-        <div className="section-head"><h3 className="card-title">Sport</h3>
-          <div className="section-actions"><button className="chip" onClick={()=>setOpenE(o=>!o)}>{openE?<Icon name="close"/>:<><Icon name="add"/> erfassen</>}</button></div></div>
-        {openE && <ExerciseForm onSubmit={e=>{addExTo(setState,date,e);setOpenE(false);}}/>}
-        {day.exercises.length===0 && !openE && <p className="empty">Noch kein Sport erfasst.</p>}
-        <ul className="entries">{day.exercises.map(e=>(
+        <div className="section-head"><h3 className="card-title">Training</h3>
+          <div className="section-actions">
+            {cloud&&cloud.user&&<button className="chip" title="Workouts aus Hevy übernehmen" onClick={()=>setHevy(true)}><Icon name="cloud_download"/> Hevy</button>}
+            <button className="chip" onClick={()=>{setEditEx(null);setOpenE(o=>!o);}}>{openE?<Icon name="close"/>:<><Icon name="add"/> erfassen</>}</button></div></div>
+        {openE && <ExerciseForm date={date} weight={state.profile.weight} onSubmit={e=>{addExTo(setState,date,e);setOpenE(false);notify('Training eingetragen');}}/>}
+        {day.exercises.length===0 && !openE && <p className="empty">Noch kein Training erfasst.</p>}
+        <ul className="entries">{day.exercises.map(e=> editEx===e.id
+          ? (<li key={e.id}><ExerciseForm date={date} weight={state.profile.weight} initial={e} submitLabel="Speichern" onSubmit={data=>{updateEx(setState,date,e.id,data);setEditEx(null);}}/></li>)
+          : (
           <li className="entry" key={e.id}>
-            <div className="entry-main"><span className="entry-name">{e.name}</span>
-              <span className="entry-macros">{e.durationMin?e.durationMin+' min · ':''}{timeLabel(e.time)}</span></div>
+            <div className="entry-main"><span className="entry-head"><span className="entry-name"><Icon name={EX_TYPES[exType(e)].icon} className="ex-icon"/> {e.name}</span>{e.source==='hevy'&&<span className="entry-qty">Hevy</span>}</span>
+              <span className="entry-macros">{[EX_TYPES[exType(e)].label,e.durationMin?e.durationMin+' min':null,e.intensity?EX_INT[e.intensity]:null,e.time?timeLabel(e.time):null].filter(Boolean).join(' · ')}</span>
+              {e.note&&<span className="entry-note">{e.note}</span>}</div>
             <div className="entry-kcal burn">−{Math.round(e.calories)}</div>
-            <div className="entry-actions"><button className="del" title="Löschen" onClick={()=>rmEx(e.id)}><Icon name="close"/></button></div>
+            <div className="entry-actions">
+              <button className="icon-btn" title="Bearbeiten" onClick={()=>{setOpenE(false);setEditEx(e.id);}}><Icon name="edit"/></button>
+              <button className="del" title="Löschen" onClick={()=>rmEx(e.id)}><Icon name="close"/></button></div>
           </li>))}</ul>
       </section>
+      {hevy && <HevyOverlay state={state} setState={setState} notify={notify} onClose={()=>setHevy(false)}/>}
       </div>
       <aside className="today-side wide-only">
         <div className="card side-seg"><div className="section-label" style={{marginBottom:8}}>Tagestyp</div><DayTypeSeg state={state} setState={setState} date={date}/></div>
@@ -1442,6 +1515,16 @@ function Stats({state,setState,setDate,goToToday,cloud,notify}){
 
   /* Trainingstag vs. Ruhetag */
   const split=[true,false].map(tr=>{const rs=tracked.filter(r=>isTrainingDay(days[r.key])===tr);return {training:tr,n:rs.length,kcal:Math.round(avgF(rs.map(r=>r.totals.calories))),budget:Math.round(avgF(rs.map(r=>r.budget))),protein:Math.round(avgF(rs.map(r=>r.totals.protein))),carbs:Math.round(avgF(rs.map(r=>r.totals.carbs))),fat:Math.round(avgF(rs.map(r=>r.totals.fat))),within:rs.filter(r=>r.totals.calories<=r.budget).length};});
+
+  /* Training im Zeitraum */
+  const exAll=rows.flatMap(r=>((days[r.key]&&days[r.key].exercises)||[]).map(e=>({...e,key:r.key})));
+  const exTrain=exAll.filter(countsAsTraining);
+  const exMin=exAll.reduce((a,e)=>a+(+e.durationMin||0),0), exKcal=exAll.reduce((a,e)=>a+(+e.calories||0),0), exVol=exAll.reduce((a,e)=>a+(+e.volumeKg||0),0);
+  const exDays=new Set(exTrain.map(e=>e.key)).size;
+  const byType=Object.keys(EX_TYPES).map(t=>{const xs=exAll.filter(e=>exType(e)===t);return {type:t,n:xs.length,min:xs.reduce((a,e)=>a+(+e.durationMin||0),0)};}).filter(x=>x.n>0);
+  const typeMax=Math.max(...byType.map(x=>x.min),1);
+  let weekStreak=0; {const curHas=w=>{for(let i=0;i<7;i++){const k=addDays(w,i);if(k>today)break;const d=days[k];if(d&&(d.exercises||[]).some(countsAsTraining))return true;}return false;}; let w=getMonday(today); if(!curHas(w))w=addDays(w,-7); for(let i=0;i<104;i++){if(curHas(w)){weekStreak++;w=addDays(w,-7);}else break;}}
+  const weeksInRange=Math.max(1,range/7);
 
   /* Eiweiß pro kg */
   const gkg=+profile.weight>0?Math.round(avgTotals.protein/profile.weight*100)/100:null;
@@ -1581,6 +1664,24 @@ function Stats({state,setState,setDate,goToToday,cloud,notify}){
           {gkg!=null && tracked.length>0 && <p className="muted small" style={{margin:'10px 0 0'}}>Ø Eiweiß <strong>{gkg.toLocaleString('de-DE')} g/kg</strong> Körpergewicht ({profile.weight} kg) · Richtwert 1,6–2,2 g/kg bei Krafttraining.</p>}
         </section>
       </div>
+
+      <section className="card">
+        <h3 className="card-title"><Icon name="fitness_center"/> Training</h3>
+        {exAll.length===0 ? <p className="empty" style={{margin:0}}>Kein Training im Zeitraum erfasst – auf „Heute“ unter Training eintragen oder aus Hevy übernehmen.</p> : (<>
+          <div className="tiles" style={{marginBottom:14}}>
+            <Stat label="Einheiten" value={exAll.length} sub={exDays+' Trainingstage'}/>
+            <Stat label="Ø pro Woche" value={(Math.round(exAll.length/weeksInRange*10)/10).toLocaleString('de-DE')} sub="Einheiten"/>
+            <Stat label="Minuten" value={exMin} sub={'Ø '+Math.round(exMin/weeksInRange)+' / Woche'}/>
+            <Stat label="Verbrannt" value={Math.round(exKcal)} sub="kcal gesamt"/>
+            {exVol>0 && <Stat label="Volumen" value={(Math.round(exVol/1000*10)/10).toLocaleString('de-DE')+' t'} sub="Hevy, Sätze × Wdh. × kg"/>}
+            <Stat label={<><Icon name="local_fire_department"/> Wochen-Serie</>} value={weekStreak} sub={weekStreak===1?'Woche mit Training':'Wochen in Folge'}/>
+          </div>
+          {byType.map(x=>(<div className="macro" key={x.type}>
+            <div className="macro-head"><span className="macro-label"><Icon name={EX_TYPES[x.type].icon}/> {EX_TYPES[x.type].label}</span><span className="macro-num">{x.n}× · {x.min} min</span></div>
+            <div className="bar"><div className="bar-fill" style={{width:(x.min/typeMax)*100+'%',background:'var(--accent)'}}/></div>
+          </div>))}
+        </>)}
+      </section>
 
       <section className="card">
         <h3 className="card-title"><Icon name="restaurant_menu"/> Top-Lebensmittel</h3>
@@ -1890,7 +1991,7 @@ function App(){
     <div className="app">
       <main className="content">
         {tab==='dashboard' && <Dashboard state={state} setState={setState} date={date} setDate={setDate} openImport={openImport}/>}
-        {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={openImport} notify={notify} manualSignal={manualSignal}/>}
+        {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={openImport} notify={notify} manualSignal={manualSignal} cloud={cloud}/>}
         {tab==='stats' && <Stats state={state} setState={setState} setDate={setDate} goToToday={()=>setTab('today')} cloud={cloud} notify={notify}/>}
         {tab==='archive' && <ArchivePage state={state} setState={setState} goDay={d=>{setDate(d);setTab('today');}}/>}
         {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud}/>}
