@@ -640,6 +640,17 @@ async function cloudHevy(since){
   if(data&&data.error)throw new Error(data.error);
   return data||{};
 }
+/* Hevy-Workouts: zuerst aus der Sync-Tabelle (geplanter Task), zusätzlich live über die Edge Function, falls ein API-Key hinterlegt ist. */
+async function loadHevyWorkouts(since){
+  const sinceDate=since.slice(0,10); const byId={}; let liveErr=null;
+  try{const {data,error}=await sb().from('hevy_sync_workouts').select('id,date,data').gte('date',sinceDate).order('date',{ascending:false});if(error)throw error;(data||[]).forEach(r=>{byId[r.id]={...r.data,id:r.id};});}
+  catch(e){liveErr=cloudErrMsg(e);}
+  try{const res=await cloudHevy(since);(res.workouts||[]).forEach(w=>{byId[w.id]=w;});liveErr=null;}
+  catch(e){const m=cloudErrMsg(e);if(!Object.keys(byId).length)liveErr=liveErr||m;}
+  const list=Object.values(byId).sort((a,b)=>String(b.start).localeCompare(String(a.start)));
+  if(!list.length&&liveErr)throw new Error(liveErr);
+  return list;
+}
 /* ---------- Garmin (Tagesdaten aus der Tabelle garmin_days, befüllt durch den Garmin-Sync) ---------- */
 const GARMIN_TYPE={walking:'cardio',running:'cardio',trail_running:'cardio',treadmill_running:'cardio',cycling:'cardio',road_biking:'cardio',mountain_biking:'cardio',indoor_cycling:'cardio',swimming:'cardio',lap_swimming:'cardio',hiking:'cardio',rowing:'cardio',elliptical:'cardio',indoor_cardio:'cardio',strength_training:'strength',yoga:'mobility',pilates:'mobility',stretching:'mobility',breathwork:'mobility'};
 const garminExType=t=>GARMIN_TYPE[t]||(/bik|cycl|run|walk|swim|hik|cardio|row|ellipt|ski|skat/.test(t||'')?'cardio':/strength|weight|crossfit/.test(t||'')?'strength':/yoga|pilat|stretch|mobil|breath/.test(t||'')?'mobility':'other');
@@ -1197,26 +1208,26 @@ function ExerciseForm({onSubmit,initial,submitLabel,date,weight}){
 function HevyOverlay({state,setState,onClose,notify}){
   const [busy,setBusy]=useState(true),[err,setErr]=useState(null),[list,setList]=useState([]),[sel,setSel]=useState({});
   const have=useMemo(()=>allHevyIds(state),[state.days]);
-  useEffect(()=>{let on=true;(async()=>{try{const since=new Date(Date.now()-30*86400000).toISOString();const res=await cloudHevy(since);const ws=(res.workouts||[]);if(!on)return;setList(ws);const s0={};ws.forEach(w=>{if(!have.has(w.id))s0[w.id]=true;});setSel(s0);}catch(e){if(on)setErr(cloudErrMsg(e));}finally{if(on)setBusy(false);}})();return ()=>{on=false;};},[]);
+  useEffect(()=>{let on=true;(async()=>{try{const since=new Date(Date.now()-30*86400000).toISOString();const ws=await loadHevyWorkouts(since);if(!on)return;setList(ws);const s0={};ws.forEach(w=>{if(!have.has(w.id))s0[w.id]=true;});setSel(s0);}catch(e){if(on)setErr(cloudErrMsg(e));}finally{if(on)setBusy(false);}})();return ()=>{on=false;};},[]);
   const chosen=list.filter(w=>sel[w.id]&&!have.has(w.id));
   function doImport(){
     const weight=state.profile.weight; let n=0;
     chosen.forEach(w=>{const d=new Date(w.start);const date=todayKey(d);const dur=w.durationMin||0;
       const note=['Hevy',w.exerciseCount+' Übungen',w.setCount+' Sätze',w.volumeKg?('Volumen '+w.volumeKg.toLocaleString('de-DE')+' kg'):null].filter(Boolean).join(' · ');
-      addExTo(setState,date,{name:w.title,type:'strength',durationMin:dur||undefined,calories:estimateKcal('strength',dur,weight),note,time:w.start,timeSet:true,source:'hevy',hevyId:w.id,volumeKg:w.volumeKg,sets:w.setCount,exercises:w.exercises.map(x=>x.title)});n++;});
+      addExTo(setState,date,{name:w.title,type:'strength',durationMin:dur||undefined,calories:estimateKcal('strength',dur,weight),note,time:w.start,timeSet:true,source:'hevy',hevyId:w.id,volumeKg:w.volumeKg,sets:w.setCount,exercises:(w.exercises||[]).map(x=>x.title)});n++;});
     if(notify)notify(n+' Workout'+(n===1?'':'s')+' aus Hevy übernommen'); onClose();
   }
   return (<Overlay title="Aus Hevy importieren" onClose={onClose}>
     <div className="card">
       {busy && <p className="muted small" style={{margin:0}}><Icon name="progress_activity" className="spin"/> Lade Workouts der letzten 30 Tage …</p>}
       {err && <p className="ai-err" style={{marginTop:0}}><Icon name="error"/> {err}</p>}
-      {!busy && !err && list.length===0 && <p className="empty" style={{margin:0}}>Keine Workouts in den letzten 30 Tagen.</p>}
+      {!busy && !err && list.length===0 && <p className="empty" style={{margin:0}}>Keine Workouts in den letzten 30 Tagen. Der Sync-Task füllt die Liste zweimal täglich.</p>}
       {list.map(w=>{const done=have.has(w.id);const d=new Date(w.start);return (
         <label key={w.id} className={'hevy-row'+(done?' done':'')}>
           <input type="checkbox" disabled={done} checked={!!sel[w.id]&&!done} onChange={e=>setSel(x=>({...x,[w.id]:e.target.checked}))}/>
           <span className="hevy-main"><span className="hevy-title">{w.title}</span>
-            <span className="muted small">{d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} {timeLabel(w.start)}{w.durationMin?' · '+w.durationMin+' min':''} · {w.exerciseCount} Übungen · {w.setCount} Sätze{w.volumeKg?' · '+w.volumeKg.toLocaleString('de-DE')+' kg':''}</span>
-            <span className="muted small ellipsis">{w.exercises.map(x=>x.title).join(', ')}</span></span>
+            <span className="muted small">{d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} {timeLabel(w.start)}{w.durationMin?' · '+w.durationMin+' min':''} · {w.exerciseCount} Übungen · {w.setCount} Sätze{w.volumeKg?' · '+(+w.volumeKg).toLocaleString('de-DE')+' kg':''}</span>
+            <span className="muted small ellipsis">{(w.exercises||[]).map(x=>x.title).join(', ')}</span></span>
           {done&&<span className="hevy-tag">importiert</span>}
         </label>);})}
       {!busy && !err && list.length>0 && <div className="import-actions"><button className="primary" disabled={!chosen.length} onClick={doImport}><Icon name="download"/> {chosen.length} importieren</button><span className="muted small" style={{alignSelf:'center'}}>Kalorien werden geschätzt (MET 5 × Gewicht × Dauer) und sind nachträglich änderbar.</span></div>}

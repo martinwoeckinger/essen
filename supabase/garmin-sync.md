@@ -1,4 +1,11 @@
-# Garmin-Sync (Anleitung für den geplanten Claude-Task)
+# Garmin- & Hevy-Sync (geplanter Claude-Task)
+
+Eingerichtet als geplanter Task „Garmin- & Hevy-Sync → Essen-App (2× täglich)“,
+08:20 und 22:20 Uhr (Europe/Vienna), mit den Connectoren Garmin („Missing MCP“)
+und Hevy. Der Task schreibt Garmin-Tagesdaten nach `garmin_days` und
+Hevy-Workouts nach `hevy_sync_workouts` (gleiche JSON-Form wie die Edge
+Function `hevy`). Die vollständige Task-Anweisung steht im Task selbst; dieses
+Dokument beschreibt Ablauf und Datenformat.
 
 Garmin bietet keine offizielle API für Endnutzer, und der Login der inoffiziellen
 Bibliotheken wird von Garmin inzwischen blockiert. Deshalb läuft der Abgleich über
