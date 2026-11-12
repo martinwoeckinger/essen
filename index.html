@@ -993,8 +993,11 @@ function AiCapture({state,cloud,date,onRows}){
   const [time,setTime]=useState(()=>defaultHM(date||todayKey(),defaultMeal())),[timeTouched,setTimeTouched]=useState(false);
   useEffect(()=>{if(!timeTouched)setTime(defaultHM(aiDate,meal==='auto'?defaultMeal():meal));},[aiDate,meal]);
   const [img,setImg]=useState(null),[busy,setBusy]=useState(false),[err,setErr]=useState(null),[hint,setHint]=useState(null);
-  const fileRef=useRef(null);
-  async function onFile(e){const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;setErr(null);try{setImg(await shrinkImage(f));}catch(x){setErr('Foto konnte nicht gelesen werden.');}}
+  const camRef=useRef(null), galRef=useRef(null);
+  async function useFile(f){if(!f)return;if(!/^image\//.test(f.type)){setErr('Bitte eine Bilddatei wählen.');return;}setErr(null);try{setImg(await shrinkImage(f));}catch(x){setErr('Foto konnte nicht gelesen werden.');}}
+  function onFile(e){const f=e.target.files&&e.target.files[0];e.target.value='';useFile(f);}
+  function onPaste(e){const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));if(it){e.preventDefault();useFile(it.getAsFile());}}
+  function onDrop(e){e.preventDefault();const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];useFile(f);}
   async function run(){
     if(busy)return; if(!desc.trim()&&!img){setErr('Bitte beschreiben, was du gegessen hast – oder ein Foto wählen.');return;}
     setBusy(true);setErr(null);setHint(null);
@@ -1011,7 +1014,7 @@ function AiCapture({state,cloud,date,onRows}){
   return (
     <div className="card">
       <p className="muted small" style={{marginTop:0}}>Beschreib frei, was du gegessen hast (Mengen helfen) – oder fotografiere Mahlzeit, Verpackung oder Nährwerttabelle. Claude schätzt die Nährwerte, du prüfst die Vorschau.</p>
-      <textarea className="pref-text" placeholder="z.B. 400 g Naturjoghurt 3,5 %, 100 g Himbeeren, 1 Proteinriegel" value={desc} onChange={e=>setDesc(e.target.value)} rows={4} disabled={busy}/>
+      <textarea className="pref-text" placeholder="z.B. 400 g Naturjoghurt 3,5 %, 100 g Himbeeren, 1 Proteinriegel – oder ein Foto hier einfügen bzw. hineinziehen" value={desc} onChange={e=>setDesc(e.target.value)} onPaste={onPaste} onDrop={onDrop} onDragOver={e=>e.preventDefault()} rows={4} disabled={busy}/>
       <div className="field-grid" style={{marginTop:10}}>
         <div className="field"><label>Datum</label><input type="date" value={aiDate} max={todayKey()} onChange={e=>{if(e.target.value)setAiDate(e.target.value);}} disabled={busy}/></div>
         <div className="field"><label>Mahlzeit</label>
@@ -1022,9 +1025,11 @@ function AiCapture({state,cloud,date,onRows}){
         <div className="field"><label>Uhrzeit</label><input type="time" value={time} onChange={e=>{setTime(e.target.value);setTimeTouched(true);}} disabled={busy}/></div>
       </div>
       <div className="import-actions">
-        <button className="chip" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}><Icon name="photo_camera"/> {img?'Anderes Foto':'Foto'}</button>
+        <button className="chip" onClick={()=>camRef.current&&camRef.current.click()} disabled={busy}><Icon name="photo_camera"/> Kamera</button>
+        <button className="chip" onClick={()=>galRef.current&&galRef.current.click()} disabled={busy}><Icon name="photo_library"/> {img?'Anderes Bild':'Aus Galerie'}</button>
         {img&&<button className="chip" onClick={()=>setImg(null)} disabled={busy}><Icon name="close"/> Foto entfernen</button>}
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={onFile}/>
+        <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={onFile}/>
+        <input ref={galRef} type="file" accept="image/*" style={{display:'none'}} onChange={onFile}/>
       </div>
       {img&&<img className="ai-photo" src={img.preview} alt="Gewähltes Foto"/>}
       {err&&<p className="ai-err"><Icon name="error"/> {err}</p>}
