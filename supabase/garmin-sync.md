@@ -39,6 +39,7 @@ den **Garmin-Connector** in Claude: Ein geplanter Claude-Task liest die Tagesdat
   "stressAvg": 36, "intensityMin": 2, "floors": 13.5,
   "bodyBattery": { "high": 87, "low": 9, "atWake": 82, "charged": 68, "drained": 78 },
   "sleep": { "hours": 5.67, "score": 76, "deepPct": 26.8, "remPct": 15.3, "hrv": 68 },
+  "weight": { "kg": 76.61, "bodyFatPct": 21.7, "muscleKg": 31.72, "waterPct": 57.2, "bmi": 23.6, "source": "INDEX_SCALE" },
   "activities": [
     { "id": 24917994626, "name": "Ágfalva Gehen", "type": "walking",
       "start": "2026-10-31 10:51:08", "durationMin": 292, "kcal": 862,
@@ -55,6 +56,8 @@ Feld-Mapping aus `get_user_summary`: `totalSteps → steps`, `dailyStepGoal → 
 `floorsAscended → floors`, `bodyBatteryHighestValue/LowestValue/AtWakeTime/ChargedValue/DrainedValue`.
 Aus `get_sleep_summary`: `sleep_hours → hours`, `sleep_score → score`,
 `deep_sleep_percent → deepPct`, `rem_sleep_percent → remPct`, `avg_overnight_hrv → hrv`.
+Aus `get_body_composition` (Waage, ein Eintrag je Tag): `weight/1000 → kg`,
+`bodyFat → bodyFatPct`, `muscleMass/1000 → muscleKg`, `bodyWater → waterPct`, `bmi`.
 Aus Aktivitäten: `duration_seconds / 60 → durationMin` (gerundet), `calories → kcal`,
 `avg_hr_bpm → avgHr`, `distance_meters / 1000 → distanceKm` (eine Nachkommastelle).
 
@@ -67,5 +70,8 @@ Ein Tag ohne Tageswerte, aber mit Aktivitäten, enthält nur `activities` und `s
   Aktivitäten lassen sich per Klick als Trainingseinheit übernehmen (Kalorien von
   Garmin, Dubletten erkannt über die Garmin-ID).
 - Analyse: Ø-Werte über den Zeitraum, Bilanz laut Garmin im Vergleich zur
-  Budget-Prognose, Schritte pro Tag.
+  Budget-Prognose, Schritte pro Tag, **Gewichtsverlauf der Waage** mit
+  7-Tage-Schnitt, Körperfett und Muskelmasse. Prognose und Eiweiß pro kg rechnen
+  mit dem letzten Waagen-Gewicht (max. 14 Tage alt), sonst mit dem Profilwert.
+- Profil: zeigt das letzte Waagen-Gewicht; optional „automatisch übernehmen“.
 - Der Wochenbericht bekommt die Garmin-Werte mit.
