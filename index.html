@@ -67,7 +67,7 @@ html,body,#root{height:100%;margin:0}
 @layer components{
   .app{ @apply flex flex-col h-full mx-auto; max-width:560px; }
   .content{ @apply flex-1 overflow-y-auto; -webkit-overflow-scrolling:touch; }
-  .page{ @apply flex flex-col gap-4; padding:calc(var(--safe-top) + 12px) 16px 28px; }
+  .page{ @apply flex flex-col gap-4; padding:calc(var(--safe-top) + 12px) 16px 40px; }
   .card{ @apply bg-s2 border border-line rounded-[20px] p-5; box-shadow:var(--shadow-card); transition:box-shadow .2s; }
   .page{ animation:fadeUp .28s cubic-bezier(.2,.8,.2,1); }
   @keyframes fadeUp{ from{ opacity:0; transform:translateY(6px); } }
@@ -89,7 +89,15 @@ html,body,#root{height:100%;margin:0}
   .tab.active{ @apply text-primary; }
   .tab.active .tab-icon{ @apply bg-primaryc; color:var(--onprimaryc); }
   .tab.active .tab-icon .msym{ font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24; }
-  .theme-toggle{ @apply text-onvar; }
+  .capture-tab{ @apply flex flex-col items-center bg-transparent border-0 cursor-pointer; flex:0 0 76px;padding:0 0 6px; }
+  .capture-btn{ @apply grid place-items-center text-onprimary; width:58px;height:58px;border-radius:50%;background:var(--accent);margin-top:-24px;box-shadow:0 6px 18px rgba(224,94,0,.38);border:4px solid var(--bg);transition:transform .15s; }
+  .capture-btn .msym{ font-size:30px;font-variation-settings:'FILL' 0,'wght' 600,'GRAD' 0,'opsz' 24; }
+  .capture-tab:active .capture-btn{ transform:scale(.94); }
+  .capture-text{ display:none; }
+  .capture-label{ font-size:11px;font-weight:700;color:var(--accent);margin-top:3px; }
+  .tab-icon{ position:relative; }
+  .tab-dot{ position:absolute;top:2px;right:12px;width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 0 2px var(--bar-bg); }
+  .tab-dot.syncing{ background:var(--accent); } .tab-dot.error{ background:var(--danger); } .tab-dot.off{ background:var(--faint); }
   .brand{ @apply hidden; }
   .brand-icon{ @apply inline-flex; } .brand-icon svg{ border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.15); }
   .primary{ @apply inline-flex items-center justify-center gap-1.5 bg-primary text-onprimary border-0 rounded-full font-semibold cursor-pointer transition; padding:12px 24px;box-shadow:0 1px 2px rgba(0,0,0,.16); }
@@ -333,7 +341,6 @@ html,body,#root{height:100%;margin:0}
   .primary:hover,.erfassen-btn:hover{filter:brightness(1.04)}
   .icon-btn:hover,.del:hover{background:var(--card2);color:var(--accent2)}
   .del:hover{color:var(--danger)}
-  .theme-toggle:hover{color:var(--accent)}
 }
 @media (min-width:760px){ .grid2{grid-template-columns:1fr 1fr} }
 @media (min-width:900px){
@@ -343,7 +350,14 @@ html,body,#root{height:100%;margin:0}
   .brand{display:flex;align-items:center;gap:10px;padding:6px 12px 18px;font-weight:800;font-size:20px}
   .tab{flex:none;flex-direction:row;justify-content:flex-start;gap:14px;padding:12px 16px;border-radius:9999px}
   .tab .tab-icon{padding:0;background:transparent;font-size:22px}
+  .tab-dot{top:-2px;right:-4px;box-shadow:0 0 0 2px var(--bg2)}
   .tab-label{font-size:14px;font-weight:600}
+  .brand{order:-2}
+  .capture-tab{order:-1;flex:none;display:block;padding:0;margin:2px 4px 14px}
+  .capture-btn{width:100%;height:auto;border-radius:9999px;margin:0;border:0;padding:13px 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;box-shadow:0 4px 14px rgba(224,94,0,.30)}
+  .capture-btn .msym{font-size:22px}
+  .capture-text{display:inline} .capture-label{display:none}
+  .capture-btn:hover{filter:brightness(1.05)}
   .tab.active{background:var(--primaryc);color:var(--onprimaryc)}
   .tab.active .tab-icon{background:transparent;color:var(--onprimaryc)}
   .tab:hover:not(.active){background:var(--card2)}
@@ -1416,8 +1430,6 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal,cloud
       <div className="today-main">
       <div className="narrow-only"><DayTypeSeg state={state} setState={setState} date={date}/></div>
 
-      <button className="erfassen-btn mobile-only" onClick={()=>openImport('auto')}><Icon name="add"/> Mahlzeit erfassen</button>
-
       <section className="card">
         <div className="section-head"><h3 className="card-title">Mahlzeiten</h3>
           <div className="section-actions">
@@ -1902,7 +1914,7 @@ function CloudCard({cloud,notify}){
       {msg&&<p className="muted small" style={{marginBottom:0}}>{msg}</p>}
     </section>);
 }
-function Profile({state,setState,notify,setDate,goToDash,cloud}){
+function Profile({state,setState,notify,setDate,goToDash,cloud,theme,toggleTheme}){
   const {profile,goal}=state;
   const fileRef=useRef(null);
   const setP=p=>setState(s=>({...s,profile:{...s.profile,...p}}));
@@ -1975,6 +1987,15 @@ function Profile({state,setState,notify,setDate,goToDash,cloud}){
         <h3 className="card-title">Vorlieben &amp; Hinweise</h3>
         <p className="muted small" style={{marginTop:0}}>Allergien, Unverträglichkeiten, Lieblings- oder No-Go-Lebensmittel – als persönliche Notiz.</p>
         <textarea className="pref-text" placeholder="z.B. vegetarisch, keine Laktose, mag kein Fisch, viel Gemüse …" value={goal.preferences} onChange={e=>setG({preferences:e.target.value})} rows={3}/>
+      </section>
+
+      <section className="card">
+        <h3 className="card-title"><Icon name="contrast"/> Darstellung</h3>
+        <div className="seg full" role="group" aria-label="Design">
+          <button className={theme!=='dark'?'on':''} onClick={()=>{if(theme==='dark')toggleTheme();}}><Icon name="light_mode"/> Hell</button>
+          <button className={theme==='dark'?'on':''} onClick={()=>{if(theme!=='dark')toggleTheme();}}><Icon name="dark_mode"/> Dunkel</button>
+        </div>
+        <p className="muted small" style={{margin:'8px 0 0'}}>Gilt für dieses Gerät; wird nicht synchronisiert.</p>
       </section>
 
       <CloudCard cloud={cloud} notify={notify}/>
@@ -2089,6 +2110,7 @@ function App(){
   },[]);
 
   const tk=todayKey(), tday=state.days[tk]; const remaining=dailyBudget(state.goal,tday)-sumCal(tday?tday.foods:[]);
+  const cloudStatusLabel={idle:'synchron',syncing:'synchronisiert …',error:'Fehler',off:'aus'}[cloud.status]||cloud.status;
   return (
     <div className="app">
       <main className="content">
@@ -2096,23 +2118,20 @@ function App(){
         {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={openImport} notify={notify} manualSignal={manualSignal} cloud={cloud} garmin={garmin}/>}
         {tab==='stats' && <Stats state={state} setState={setState} setDate={setDate} goToToday={()=>setTab('today')} cloud={cloud} notify={notify} garmin={garmin}/>}
         {tab==='archive' && <ArchivePage state={state} setState={setState} goDay={d=>{setDate(d);setTab('today');}}/>}
-        {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud}/>}
+        {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud} theme={theme} toggleTheme={toggleTheme}/>}
       </main>
       <nav className="tabbar">
         <div className="brand"><span className="brand-icon"><svg viewBox="0 0 512 512" width="28" height="28" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#17171a"/><rect x="120" y="120" width="64" height="272" rx="32" fill="#f97316"/><rect x="120" y="120" width="272" height="64" rx="32" fill="#34d399"/><rect x="120" y="224" width="220" height="64" rx="32" fill="#38bdf8"/><rect x="120" y="328" width="272" height="64" rx="32" fill="#c084fc"/></svg></span><span className="brand-name">Essen</span></div>
-        {TABS.map((t,i)=>(
-        <button key={t.id} className={'tab'+(tab===t.id?' active':'')+(t.desktop?' desk-only':'')} title={t.label+' ('+(i+1)+')'} onClick={()=>setTab(t.id)}>
-          <span className="tab-icon"><Icon name={t.icon}/></span><span className="tab-label">{t.label}</span></button>))}
+        {TABS.map((t,i)=>(<React.Fragment key={t.id}>
+          {i===2 && <button className="capture-tab" onClick={()=>openImport('auto')} title="Mahlzeit erfassen (k = KI, i = Tabelle, n = manuell)" aria-label="Mahlzeit erfassen">
+            <span className="capture-btn"><Icon name="add"/><span className="capture-text">Mahlzeit erfassen</span></span><span className="capture-label">Erfassen</span></button>}
+          <button className={'tab'+(tab===t.id?' active':'')+(t.desktop?' desk-only':'')} title={t.label+' ('+(i+1)+')'+(t.id==='profile'&&cloud.configured?(' · Cloud: '+(cloud.user?(cloud.err||cloudStatusLabel):'nicht angemeldet')):'')} onClick={()=>setTab(t.id)}>
+            <span className="tab-icon"><Icon name={t.icon}/>{t.id==='profile'&&cloud.configured&&<span className={'tab-dot '+(!cloud.user?'off':cloud.status)} aria-hidden="true"/>}</span><span className="tab-label">{t.label}</span></button>
+        </React.Fragment>))}
         <button className="side-stat desk-only" onClick={()=>{setDate(tk);setTab('today');}} title="Heute (t)">
           <span className={'side-stat-value'+(remaining<0?' over':'')}>{remaining<0?'+'+Math.abs(remaining):remaining} kcal</span>
           <span className="side-stat-label">{remaining<0?'über Budget heute':'heute übrig'}</span>
         </button>
-        <button className="tab theme-toggle" onClick={toggleTheme} title="Hell/Dunkel umschalten" aria-label="Design umschalten">
-          <span className="tab-icon"><Icon name={theme==='dark'?'light_mode':'dark_mode'}/></span>
-          <span className="tab-label">{theme==='dark'?'Hell':'Dunkel'}</span></button>
-        {cloud.configured && <button className={'tab cloud-tab '+cloud.status} onClick={()=>setTab('profile')} title={cloud.user?('Cloud: '+(cloud.err||cloud.status)):'Cloud: nicht angemeldet'} aria-label="Cloud-Status">
-          <span className="tab-icon"><Icon name={!cloud.user?'cloud_off':cloud.status==='syncing'?'cloud_sync':cloud.status==='error'?'cloud_alert':'cloud_done'}/></span>
-          <span className="tab-label">{!cloud.user?'Offline':cloud.status==='syncing'?'Sync …':cloud.status==='error'?'Fehler':'Cloud'}</span></button>}
         <button className="tab help-tab desk-only" onClick={()=>setHelpOpen(true)} title="Tastenkürzel (?)" aria-label="Tastenkürzel">
           <span className="tab-icon"><Icon name="keyboard"/></span><span className="tab-label">Kürzel</span></button>
       </nav>
