@@ -271,6 +271,7 @@ html,body,#root{height:100%;margin:0}
   .hevy-main{ @apply flex flex-col gap-0.5; min-width:0;flex:1; } .hevy-title{ font-weight:700; }
   .hevy-row.done{ opacity:.55; } .hevy-tag{ @apply bg-s3 text-onvar rounded-full; font-size:11px;font-weight:700;padding:2px 8px;white-space:nowrap; }
   .gtiles{ @apply grid gap-2; grid-template-columns:repeat(3,1fr); }
+  .scale-row{ @apply flex flex-col gap-2; margin-top:4px; } .scale-row .chip{ align-self:flex-start; }
   .gtiles div{ @apply flex flex-col items-center text-center bg-s3 rounded-xl; padding:10px 6px; }
   .gtiles b{ font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em; } .gtiles span{ @apply text-onvar; font-size:11px;margin-top:2px; }
   .preview-meal{ margin-top:8px; }
@@ -672,6 +673,13 @@ async function loadHevyWorkouts(since){
 const GARMIN_TYPE={walking:'cardio',running:'cardio',trail_running:'cardio',treadmill_running:'cardio',cycling:'cardio',road_biking:'cardio',mountain_biking:'cardio',indoor_cycling:'cardio',swimming:'cardio',lap_swimming:'cardio',hiking:'cardio',rowing:'cardio',elliptical:'cardio',indoor_cardio:'cardio',strength_training:'strength',yoga:'mobility',pilates:'mobility',stretching:'mobility',breathwork:'mobility'};
 const garminExType=t=>GARMIN_TYPE[t]||(/bik|cycl|run|walk|swim|hik|cardio|row|ellipt|ski|skat/.test(t||'')?'cardio':/strength|weight|crossfit/.test(t||'')?'strength':/yoga|pilat|stretch|mobil|breath/.test(t||'')?'mobility':'other');
 const garminTypeLabel=t=>({walking:'Gehen',running:'Laufen',trail_running:'Trailrun',cycling:'Radfahren',road_biking:'Rennrad',mountain_biking:'MTB',indoor_cycling:'Indoor-Rad',swimming:'Schwimmen',hiking:'Wandern',strength_training:'Krafttraining',yoga:'Yoga'}[t]||(t||'').replace(/_/g,' '));
+/* Letztes Waagen-Gewicht aus den Garmin-Tagesdaten (innerhalb von maxAgeDays). */
+function latestGarminWeight(garminDays,maxAgeDays=14){
+  if(!garminDays)return null; const today=todayKey(); let best=null;
+  Object.keys(garminDays).forEach(k=>{const w=garminDays[k]&&garminDays[k].weight;if(w&&w.kg>0&&k<=today&&(!best||k>best.date))best={date:k,...w};});
+  if(best&&ts(best.date)<ts(addDays(today,-maxAgeDays)))return null; return best;
+}
+const effectiveWeight=(state,garminDays)=>{const g=latestGarminWeight(garminDays);return g?g.kg:(+state.profile.weight||0);};
 const allGarminIds = state => {const ids=new Set();Object.values(state.days||{}).forEach(d=>(d.exercises||[]).forEach(e=>{if(e.garminId!=null)ids.add(String(e.garminId));}));return ids;};
 const parseLocalTs = s=>{const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);if(!m)return null;return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0)).toISOString();};
 async function cloudGarminDays(from,to){
@@ -874,16 +882,19 @@ function smoothPath(seg,yMin,yMax){
     d+=` C${p1.x+(p2.x-p0.x)/6},${cl(p1.y+(p2.y-p0.y)/6)} ${p2.x-(p3.x-p1.x)/6},${cl(p2.y-(p3.y-p1.y)/6)} ${p2.x},${p2.y}`;}
   return d;
 }
-function AreaChart({data,unit='',color='var(--data)',refLabel='Budget',height=210}){
+function AreaChart({data,unit='',color='var(--data)',refLabel='Budget',height=210,baseline='zero',fmt=fmtK,decimals=1,avgWindow=7}){
   const wrap=useRef(null); const [w,setW]=useState(600); const [hi,setHi]=useState(null);
   useEffect(()=>{const el=wrap.current;if(!el)return;const m=()=>setW(el.clientWidth||600);m();if(window.ResizeObserver){const ro=new ResizeObserver(m);ro.observe(el);return ()=>ro.disconnect();}window.addEventListener('resize',m);return ()=>window.removeEventListener('resize',m);},[]);
   const padL=36,padR=12,padT=16,padB=26, iw=Math.max(10,w-padL-padR), ih=height-padT-padB;
   const refVal=(data.find(d=>d.ref!=null)||{}).ref;
-  const rawMax=Math.max(...data.map(d=>Math.max(d.value||0,d.ref||0)),1); const max=niceMax(rawMax*1.08);
-  const n=data.length; const X=i=>padL+(n>1?i/(n-1)*iw:iw/2); const Y=v=>padT+ih-(v/max)*ih;
+  const vals=data.map(d=>d.value).filter(v=>v!=null); const refs=data.map(d=>d.ref).filter(v=>v!=null);
+  let lo=0, max;
+  if(baseline==='auto'&&vals.length){const mn=Math.min(...vals,...refs), mx=Math.max(...vals,...refs); const span=Math.max(mx-mn,1); lo=Math.floor((mn-span*0.25)*2)/2; max=Math.ceil((mx+span*0.25)*2)/2; if(max<=lo)max=lo+1;}
+  else { const rawMax=Math.max(...data.map(d=>Math.max(d.value||0,d.ref||0)),1); max=niceMax(rawMax*1.08); }
+  const n=data.length; const X=i=>padL+(n>1?i/(n-1)*iw:iw/2); const Y=v=>padT+ih-((v-lo)/(max-lo))*ih;
   const pts=data.map((d,i)=>d.value==null?null:{x:X(i),y:Y(d.value),d,i});
   const segs=[]; let cur=[]; pts.forEach(p=>{if(p)cur.push(p);else{if(cur.length)segs.push(cur);cur=[];}}); if(cur.length)segs.push(cur);
-  const avgPts=n>=14?data.map((d,i)=>{const win=data.slice(Math.max(0,i-6),i+1).map(v=>v.value).filter(v=>v!=null);return win.length>=3?{x:X(i),y:Y(avgF(win))}:null;}).filter(Boolean):[];
+  const avgPts=(n>=14&&avgWindow)?data.map((d,i)=>{const win=data.slice(Math.max(0,i-(avgWindow-1)),i+1).map(v=>v.value).filter(v=>v!=null);return win.length>=3?{x:X(i),y:Y(avgF(win))}:null;}).filter(Boolean):[];
   const step=n<=14?1:Math.ceil(n/8);
   const gid=useMemo(()=>'ag'+Math.random().toString(36).slice(2,7),[]);
   const onMove=e=>{const r=wrap.current.getBoundingClientRect();const mx=e.clientX-r.left-padL;let i=Math.round(mx/iw*(n-1));i=Math.max(0,Math.min(n-1,i));setHi(i);};
@@ -892,15 +903,15 @@ function AreaChart({data,unit='',color='var(--data)',refLabel='Budget',height=21
   return (<div className="achart" ref={wrap} onMouseMove={onMove} onMouseLeave={()=>setHi(null)} onTouchStart={e=>onMove(e.touches[0])} onTouchMove={e=>onMove(e.touches[0])}>
     <svg width={w} height={height} className="achart-svg">
       <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".28"/><stop offset="1" stopColor={color} stopOpacity=".02"/></linearGradient></defs>
-      {[0,.25,.5,.75,1].map(f=>(<g key={f}><line x1={padL} x2={w-padR} y1={Y(max*f)} y2={Y(max*f)} className="achart-grid"/><text x={padL-6} y={Y(max*f)+3} className="achart-ylab">{fmtK(max*f)}</text></g>))}
-      {segs.map((sg,k)=>(<g key={k}><path d={smoothPath(sg,padT,padT+ih)+` L${sg[sg.length-1].x},${Y(0)} L${sg[0].x},${Y(0)} Z`} fill={`url(#${gid})`}/><path d={smoothPath(sg,padT,padT+ih)} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" className="achart-line"/></g>))}
+      {[0,.25,.5,.75,1].map(f=>(<g key={f}><line x1={padL} x2={w-padR} y1={Y(lo+(max-lo)*f)} y2={Y(lo+(max-lo)*f)} className="achart-grid"/><text x={padL-6} y={Y(lo+(max-lo)*f)+3} className="achart-ylab">{fmt(lo+(max-lo)*f)}</text></g>))}
+      {segs.map((sg,k)=>(<g key={k}><path d={smoothPath(sg,padT,padT+ih)+` L${sg[sg.length-1].x},${Y(lo)} L${sg[0].x},${Y(lo)} Z`} fill={`url(#${gid})`}/><path d={smoothPath(sg,padT,padT+ih)} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" className="achart-line"/></g>))}
       {avgPts.length>1&&<path d={smoothPath(avgPts,padT,padT+ih)} fill="none" stroke="var(--text)" strokeOpacity=".45" strokeWidth="1.5" strokeDasharray="3 4"/>}
       {refVal!=null&&<g><line x1={padL} x2={w-padR} y1={Y(refVal)} y2={Y(refVal)} className="achart-ref"/><text x={w-padR} y={Y(refVal)-5} className="achart-reflab">{refLabel} {Math.round(refVal)}</text></g>}
       {pts.map(p=>p&&<circle key={p.i} cx={p.x} cy={p.y} r={hi===p.i?5:3} className={'achart-dot'+(p.d.over?' over':'')} style={{fill:p.d.over?'var(--danger)':color}}/>)}
       {hp&&<line x1={hp.x} x2={hp.x} y1={padT} y2={padT+ih} className="achart-cursor"/>}
       {data.map((d,i)=>i%step===0&&<text key={d.key} x={X(i)} y={height-6} className="achart-xlab">{d.label!=null?d.label:d.key.slice(8)}</text>)}
     </svg>
-    {hd&&<div className="achart-tip" style={{left:tipLeft}}><b>{hd.value!=null?Math.round(hd.value*10)/10+unit:'nicht erfasst'}</b><span>{hd.title||dateLabel(hd.key)}{hd.ref!=null&&hd.value!=null?' · '+(hd.value>hd.ref?'+':'')+Math.round(hd.value-hd.ref)+unit+' zum Ziel':''}</span></div>}
+    {hd&&<div className="achart-tip" style={{left:tipLeft}}><b>{hd.value!=null?(decimals?hd.value.toLocaleString('de-DE',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}):Math.round(hd.value))+unit:'nicht erfasst'}</b><span>{hd.title||dateLabel(hd.key)}{hd.ref!=null&&hd.value!=null?' · '+(hd.value>hd.ref?'+':'')+Math.round(hd.value-hd.ref)+unit+' zum Ziel':''}</span></div>}
   </div>);
 }
 function Heatmap({days,goal,onPick,weeks=9}){
@@ -1339,6 +1350,7 @@ function GarminCard({state,setState,date,garmin,notify}){
         <div><b>{g.restingHr||'–'}</b><span>Ruhepuls</span></div>
         <div><b>{g.sleep&&g.sleep.hours!=null?(Math.round(g.sleep.hours*10)/10).toLocaleString('de-DE')+' h':'–'}</b><span>Schlaf{g.sleep&&g.sleep.score?' · Score '+g.sleep.score:''}</span></div>
         <div><b>{g.bodyBattery&&g.bodyBattery.atWake!=null?g.bodyBattery.atWake+' → '+g.bodyBattery.low:'–'}</b><span>Body Battery</span></div>
+        {g.weight&&g.weight.kg>0&&<div><b>{g.weight.kg.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})} kg</b><span>Waage{g.weight.bodyFatPct?' · '+g.weight.bodyFatPct.toLocaleString('de-DE')+' % KF':''}</span></div>}
       </div>
       {day.foods.length>0 && <div className="energy-row total" style={{paddingTop:10}}><span>Bilanz laut Garmin (gegessen − Verbrauch)</span><strong style={{color:eaten-g.totalKcal>0?'var(--danger)':'var(--good)'}}>{eaten-g.totalKcal>0?'+':''}{Math.round(eaten-g.totalKcal)} kcal</strong></div>}
       {g.stressAvg!=null && <p className="muted small" style={{margin:'6px 0 0'}}>Stress Ø {g.stressAvg}{g.intensityMin!=null?' · Intensitätsminuten '+g.intensityMin:''}{g.floors!=null?' · '+Math.round(g.floors)+' Stockwerke':''}{g.sleep&&g.sleep.hrv?' · HRV '+Math.round(g.sleep.hrv):''}</p>}
@@ -1350,7 +1362,8 @@ function GarminCard({state,setState,date,garmin,notify}){
         {done?<span className="hevy-tag">übernommen</span>:<button className="chip" onClick={()=>take(a)}><Icon name="add"/> Übernehmen</button>}
       </div>);})}
     </div>)}
-    {g && !hasBody && !(g.activities||[]).length && <p className="empty" style={{margin:0}}>Keine Tageswerte vorhanden.</p>}
+    {g && !hasBody && g.weight && g.weight.kg>0 && <p className="muted small" style={{margin:0}}>Waage: <strong>{g.weight.kg.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})} kg</strong>{g.weight.bodyFatPct?' · '+g.weight.bodyFatPct.toLocaleString('de-DE')+' % Körperfett':''}</p>}
+    {g && !hasBody && !(g.activities||[]).length && !(g.weight&&g.weight.kg>0) && <p className="empty" style={{margin:0}}>Keine Tageswerte vorhanden.</p>}
   </section>);
 }
 function DateNav({date,setDate}){
@@ -1516,7 +1529,8 @@ function buildWeekPayload(state,mon,garminDays){
       meals:MEAL_ORDER.map(m=>({meal:MEALS[m].label,kcal:sumCal(d.foods.filter(f=>f.meal===m))})).filter(x=>x.kcal>0),
       topFoods:[...d.foods].sort((a,b)=>b.calories-a.calories).slice(0,4).map(f=>f.name+' ('+Math.round(f.calories)+' kcal)'),
       exercises:(d.exercises||[]).map(e=>({name:e.name,type:e.type||null,min:e.durationMin||null,kcal:Math.round(e.calories||0)})),
-      garmin:gd[k]&&gd[k].totalKcal!=null?{burnedKcal:Math.round(gd[k].totalKcal),activeKcal:Math.round(gd[k].activeKcal||0),steps:gd[k].steps,restingHr:gd[k].restingHr,sleepH:gd[k].sleep?gd[k].sleep.hours:null,sleepScore:gd[k].sleep?gd[k].sleep.score:null,bodyBatteryAtWake:gd[k].bodyBattery?gd[k].bodyBattery.atWake:null,stressAvg:gd[k].stressAvg}:null});}
+      garmin:gd[k]&&gd[k].totalKcal!=null?{burnedKcal:Math.round(gd[k].totalKcal),activeKcal:Math.round(gd[k].activeKcal||0),steps:gd[k].steps,restingHr:gd[k].restingHr,sleepH:gd[k].sleep?gd[k].sleep.hours:null,sleepScore:gd[k].sleep?gd[k].sleep.score:null,bodyBatteryAtWake:gd[k].bodyBattery?gd[k].bodyBattery.atWake:null,stressAvg:gd[k].stressAvg}:null,
+      weightKg:gd[k]&&gd[k].weight&&gd[k].weight.kg>0?gd[k].weight.kg:null,bodyFatPct:gd[k]&&gd[k].weight?gd[k].weight.bodyFatPct||null:null});}
   return {week:'KW '+isoWeek(mon)+' ab '+deDate(mon),profile:{sex:profile.sex,age:profile.age,height:profile.height,weight:profile.weight,targetWeight:profile.targetWeight},
     goals:{kcalTraining:goal.kcalTraining,kcalRest:goal.kcalRest,proteinTraining:goal.proteinTraining,proteinRest:goal.proteinRest,fiberGoal:goal.fiberGoal,sugarLimit:goal.sugarLimit,saltLimit:goal.saltLimit},
     preferences:goal.preferences||'',days:list};
@@ -1581,6 +1595,8 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
   const balance=tracked.reduce((a,r)=>a+(r.totals.calories-r.budget),0);
   const balKg=Math.round(balance/KCAL_PER_KG*100)/100;
   let streak=0; for(let i=0;;i++){const k=addDays(today,-i);if((days[k]&&days[k].foods.length)>0)streak++;else break;}
+  const gdAll=garmin&&garmin.days?garmin.days:{};
+  const scale=latestGarminWeight(gdAll); const baseWeight=scale?scale.kg:+profile.weight;
 
   /* Essenszeiten im Zeitraum */
   const timeDays=tracked.map(r=>({key:r.key,st:eatingStats(days[r.key]),fast:fastingBefore(days,r.key)})).filter(x=>x.st);
@@ -1619,8 +1635,8 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
   const gSteps=rows.map(r=>({key:r.key,value:gd[r.key]&&gd[r.key].steps!=null?gd[r.key].steps:null,ref:gd[r.key]&&gd[r.key].stepGoal}));
   const gActs=rows.flatMap(r=>((gd[r.key]&&gd[r.key].activities)||[]));
 
-  /* Eiweiß pro kg */
-  const gkg=+profile.weight>0?Math.round(avgTotals.protein/profile.weight*100)/100:null;
+  /* Eiweiß pro kg (Waage, sonst Profil) */
+  const gkg=baseWeight>0?Math.round(avgTotals.protein/baseWeight*100)/100:null;
 
   /* Top-Lebensmittel */
   const foodMap={}; tracked.forEach(r=>{(days[r.key].foods||[]).forEach(f=>{const k=(f.name||'').trim().toLowerCase();if(!k)return;const o=foodMap[k]||(foodMap[k]={name:f.name.trim(),count:0,kcal:0});o.count++;o.kcal+=+f.calories||0;});});
@@ -1630,9 +1646,20 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
 
   const shortDate=k=>{const[y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'numeric'});};
   const weeklyKg=Math.round((avgDev*7/KCAL_PER_KG)*100)/100;
-  const proj4=Math.round((profile.weight+weeklyKg*4)*10)/10;
+  const proj4=Math.round((baseWeight+weeklyKg*4)*10)/10;
   let etaWeeks=null,etaDate=null;
-  if(profile.targetWeight!=null && weeklyKg!==0){const delta=profile.targetWeight-profile.weight;if(Math.sign(delta)===Math.sign(weeklyKg)){etaWeeks=Math.ceil(Math.abs(delta)/Math.abs(weeklyKg));etaDate=shortDate(addDays(today,etaWeeks*7));}}
+  if(profile.targetWeight!=null && weeklyKg!==0){const delta=profile.targetWeight-baseWeight;if(Math.sign(delta)===Math.sign(weeklyKg)){etaWeeks=Math.ceil(Math.abs(delta)/Math.abs(weeklyKg));etaDate=shortDate(addDays(today,etaWeeks*7));}}
+  /* Gewichtsverlauf (Waage) */
+  const wRows=rows.map(r=>{const w=gdAll[r.key]&&gdAll[r.key].weight;return {key:r.key,value:w&&w.kg>0?w.kg:null,fat:w&&w.bodyFatPct?w.bodyFatPct:null,muscle:w&&w.muscleKg?w.muscleKg:null};});
+  const wVals=wRows.filter(r=>r.value!=null);
+  const wFirstAvg=avgF(wVals.slice(0,Math.min(7,Math.max(1,Math.floor(wVals.length/2)))).map(r=>r.value)), wLastAvg=avgF(wVals.slice(-Math.min(7,Math.max(1,Math.floor(wVals.length/2)))).map(r=>r.value));
+  const wChange=wVals.length>=2?wLastAvg-wFirstAvg:null;
+  const fatVals=wVals.filter(r=>r.fat!=null), musVals=wVals.filter(r=>r.muscle!=null);
+  const fatChange=fatVals.length>=4?avgF(fatVals.slice(-7).map(r=>r.fat))-avgF(fatVals.slice(0,7).map(r=>r.fat)):null;
+  const musChange=musVals.length>=4?avgF(musVals.slice(-7).map(r=>r.muscle))-avgF(musVals.slice(0,7).map(r=>r.muscle)):null;
+  const wMin=wVals.length?Math.min(...wVals.map(r=>r.value)):null, wMax=wVals.length?Math.max(...wVals.map(r=>r.value)):null;
+  const kg1=v=>v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const signed=(v,d=1,u='')=>(v>0?'+':'')+v.toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+u;
   const enoughForProg=tracked.length>=3;
 
   return (
@@ -1655,9 +1682,26 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
           {tracked.length>0 && <div className="kpi"><span className="kpi-big" style={{color:METRIC_COLOR[metric]}}>{metric==='calories'?Math.round(mAvg):mAvg}</span><span className="kpi-unit">{mInfo.unit.trim()} Ø</span>{present.length>=4 && <span className={'trend '+(trend>0?'up':trend<0?'down':'flat')}>{trend>0?<><Icon name="trending_up"/> steigend</>:trend<0?<><Icon name="trending_down"/> fallend</>:<><Icon name="trending_flat"/> stabil</>}</span>}</div>}
         </div>
         <div className="metric-chips">{METRICS.map(m=>(<button key={m.id} className={'metric-chip'+(metric===m.id?' on':'')} onClick={()=>setMetric(m.id)}>{m.label}</button>))}</div>
-        <AreaChart data={chartData.map((d,i)=>({...d,value:rows[i].has?d.value:null}))} unit={mInfo.unit} color={METRIC_COLOR[metric]}/>
+        <AreaChart data={chartData.map((d,i)=>({...d,value:rows[i].has?d.value:null}))} unit={mInfo.unit} color={METRIC_COLOR[metric]} decimals={metric==='salt'?1:0}/>
         <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> Ziel/Budget</span><span><i className="sw danger"/> über Ziel</span>{range>=14&&<span><i className="sw avg"/> 7-Tage-Schnitt</span>}</div>
       </section>
+
+      {cloud&&cloud.user && <section className="card">
+        <div className="section-head"><h3 className="card-title"><Icon name="monitor_weight"/> Gewicht (Waage)</h3>
+          {wVals.length>0 && <div className="kpi"><span className="kpi-big">{kg1(wVals[wVals.length-1].value)}</span><span className="kpi-unit">kg · {dateLabel(wVals[wVals.length-1].key)}</span>{wChange!=null && <span className={'trend '+(wChange<-0.2?'up':wChange>0.2?'down':'flat')}>{wChange<-0.2?<Icon name="trending_down"/>:wChange>0.2?<Icon name="trending_up"/>:<Icon name="trending_flat"/>} {signed(wChange,1,' kg')}</span>}</div>}
+        </div>
+        {wVals.length===0 ? <p className="empty" style={{margin:0}}>Keine Waagen-Daten im Zeitraum. Der Garmin-Sync übernimmt Messungen deiner Garmin-Waage automatisch.</p> : (<>
+          <AreaChart data={wRows} unit=" kg" color="var(--accent)" baseline="auto" fmt={v=>kg1(v)} decimals={1}/>
+          <div className="tiles" style={{marginTop:14}}>
+            <Stat label="Ø 7 Tage" value={kg1(wLastAvg)+' kg'} sub={wChange!=null?'vs. Start '+signed(wChange,1,' kg'):''}/>
+            <Stat label="Spanne" value={kg1(wMin)+'–'+kg1(wMax)} sub="kg im Zeitraum"/>
+            {fatVals.length>0 && <Stat label="Körperfett" value={fatVals[fatVals.length-1].fat.toLocaleString('de-DE')+' %'} sub={fatChange!=null?signed(fatChange,1,' %-Pkt.'):''}/>}
+            {musVals.length>0 && <Stat label="Muskelmasse" value={kg1(musVals[musVals.length-1].muscle)+' kg'} sub={musChange!=null?signed(musChange,1,' kg'):''}/>}
+            <Stat label="Messungen" value={wVals.length} sub={'von '+range+' Tagen'}/>
+          </div>
+          <p className="muted small" style={{margin:'10px 0 0'}}>Linie = Tageswerte, gestrichelt = 7-Tage-Schnitt (ab 14 Tagen). Änderung vergleicht den Schnitt der ersten und letzten Tage im Zeitraum. Tagesschwankungen von 1–2 kg sind normal (Wasser, Mageninhalt).</p>
+        </>)}
+      </section>}
 
       <section className="card">
         <h3 className="card-title"><Icon name="auto_graph"/> Prognose</h3>
@@ -1667,6 +1711,7 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
             <div className="kpi"><span className="kpi-big" style={{color:weeklyKg<0?'var(--good)':weeklyKg>0?'var(--danger)':'var(--muted)'}}>{weeklyKg>0?'+':''}{weeklyKg}</span><span className="kpi-unit">kg / Woche</span></div>
             <p className="lede" style={{marginTop:8}}>Bei aktuellem Schnitt: <strong>{avgDev>0?'+':''}{avgDev} kcal/Tag</strong> {avgDev<0?'Defizit':avgDev>0?'Überschuss':'auf Budget'}.</p>
             <div className="divider"/>
+            <div className="energy-row"><span>Ausgangsgewicht{scale?' (Waage '+dateLabel(scale.date)+')':' (Profil)'}</span><strong>{kg1(baseWeight)} kg</strong></div>
             <div className="energy-row"><span>Gewicht in 4 Wochen ≈</span><strong>{proj4} kg</strong></div>
             {etaWeeks!=null
               ? <div className="energy-row total"><span>Ziel {profile.targetWeight} kg voraussichtlich</span><strong>~{etaWeeks} Wo · {etaDate}</strong></div>
@@ -1754,7 +1799,7 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
             <tr><td>Ø KH</td>{split.map(x=><td key={+x.training}>{x.n?x.carbs+' g':'–'}</td>)}</tr>
             <tr><td>Ø Fett</td>{split.map(x=><td key={+x.training}>{x.n?x.fat+' g':'–'}</td>)}</tr>
           </tbody></table>
-          {gkg!=null && tracked.length>0 && <p className="muted small" style={{margin:'10px 0 0'}}>Ø Eiweiß <strong>{gkg.toLocaleString('de-DE')} g/kg</strong> Körpergewicht ({profile.weight} kg) · Richtwert 1,6–2,2 g/kg bei Krafttraining.</p>}
+          {gkg!=null && tracked.length>0 && <p className="muted small" style={{margin:'10px 0 0'}}>Ø Eiweiß <strong>{gkg.toLocaleString('de-DE')} g/kg</strong> Körpergewicht ({kg1(baseWeight)} kg{scale?', Waage':''}) · Richtwert 1,6–2,2 g/kg bei Krafttraining.</p>}
         </section>
       </div>
 
@@ -1914,8 +1959,8 @@ function CloudCard({cloud,notify}){
       {msg&&<p className="muted small" style={{marginBottom:0}}>{msg}</p>}
     </section>);
 }
-function Profile({state,setState,notify,setDate,goToDash,cloud,theme,toggleTheme}){
-  const {profile,goal}=state;
+function Profile({state,setState,notify,setDate,goToDash,cloud,theme,toggleTheme,garmin}){
+  const {profile,goal}=state; const scaleW=latestGarminWeight(garmin&&garmin.days);
   const fileRef=useRef(null);
   const setP=p=>setState(s=>({...s,profile:{...s.profile,...p}}));
   const setG=g=>setState(s=>({...s,goal:{...s.goal,...g}}));
@@ -1946,8 +1991,13 @@ function Profile({state,setState,notify,setDate,goToDash,cloud,theme,toggleTheme
         <div className="field-grid">
           {[['age','Alter','J'],['height','Größe','cm'],['weight','Gewicht','kg']].map(([k,l,u])=>(
             <div className="field" key={k}><label>{l}</label>
-              <div className="num-suffix"><input inputMode="decimal" value={profile[k]} onChange={e=>setP({[k]:numDe(e.target.value)})}/><span>{u}</span></div></div>))}
+              <div className="num-suffix"><input inputMode="decimal" value={profile[k]} onChange={e=>setP({[k]:numDe(e.target.value)})} disabled={k==='weight'&&!!profile.autoWeight&&!!scaleW}/><span>{u}</span></div></div>))}
         </div>
+        {scaleW && (<div className="scale-row">
+          <span className="muted small">Garmin-Waage: <strong>{scaleW.kg.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})} kg</strong> ({dateLabel(scaleW.date)}){scaleW.bodyFatPct?' · '+scaleW.bodyFatPct.toLocaleString('de-DE')+' % Körperfett':''}</span>
+          <label className="toggle" style={{fontSize:13}}><input type="checkbox" checked={!!profile.autoWeight} onChange={e=>{const on=e.target.checked;setP(on?{autoWeight:true,weight:Math.round(scaleW.kg*10)/10}:{autoWeight:false});}}/><span>Gewicht automatisch von der Waage übernehmen</span></label>
+          {!profile.autoWeight && <button className="chip" onClick={()=>setP({weight:Math.round(scaleW.kg*10)/10})}><Icon name="download"/> Jetzt übernehmen</button>}
+        </div>)}
       </section>
 
       <section className="card">
@@ -2057,6 +2107,7 @@ function App(){
   const notify=useCallback(msg=>{setToast(msg);clearTimeout(toastT.current);toastT.current=setTimeout(()=>setToast(null),1900);},[]);
   const cloud=useCloud(state,rawSet,notify);
   const garmin=useGarmin(cloud);
+  useEffect(()=>{if(!state.profile.autoWeight)return;const w=latestGarminWeight(garmin.days);if(!w)return;const kg=Math.round(w.kg*10)/10;if(Math.abs((+state.profile.weight||0)-kg)>=0.05)setState(s=>({...s,profile:{...s.profile,weight:kg}}));},[garmin.days,state.profile.autoWeight]);
   const openImport=useCallback((mode)=>setImportOpen(typeof mode==='string'?mode:'auto'),[]);
 
   const theme=(state.ui&&state.ui.theme==='dark')?'dark':'light';
@@ -2118,7 +2169,7 @@ function App(){
         {tab==='today' && <Today state={state} setState={setState} date={date} setDate={setDate} openImport={openImport} notify={notify} manualSignal={manualSignal} cloud={cloud} garmin={garmin}/>}
         {tab==='stats' && <Stats state={state} setState={setState} setDate={setDate} goToToday={()=>setTab('today')} cloud={cloud} notify={notify} garmin={garmin}/>}
         {tab==='archive' && <ArchivePage state={state} setState={setState} goDay={d=>{setDate(d);setTab('today');}}/>}
-        {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud} theme={theme} toggleTheme={toggleTheme}/>}
+        {tab==='profile' && <Profile state={state} setState={setState} notify={notify} setDate={setDate} goToDash={()=>setTab('dashboard')} cloud={cloud} theme={theme} toggleTheme={toggleTheme} garmin={garmin}/>}
       </main>
       <nav className="tabbar">
         <div className="brand"><span className="brand-icon"><svg viewBox="0 0 512 512" width="28" height="28" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#17171a"/><rect x="120" y="120" width="64" height="272" rx="32" fill="#f97316"/><rect x="120" y="120" width="272" height="64" rx="32" fill="#34d399"/><rect x="120" y="224" width="220" height="64" rx="32" fill="#38bdf8"/><rect x="120" y="328" width="272" height="64" rx="32" fill="#c084fc"/></svg></span><span className="brand-name">Essen</span></div>

@@ -63,7 +63,10 @@ Die gepflegte, deployte App bleibt die HTML-Version (`index.html`).
 - **Garmin** – Tagesdaten (Verbrauch, aktive kcal, Schritte, Ruhepuls, Schlaf,
   Body Battery, Stress) und Aktivitäten aus Garmin Connect, mit Bilanz
   „gegessen − Verbrauch“ pro Tag und im Zeitraum. Aktivitäten lassen sich als
-  Trainingseinheit übernehmen. Befüllt über einen Garmin-Sync, siehe
+  Trainingseinheit übernehmen. **Gewicht von der Garmin-Waage**: Verlauf mit
+  7-Tage-Schnitt, Körperfett und Muskelmasse in der Analyse; Prognose und
+  Eiweiß pro kg rechnen mit dem letzten Waagen-Wert, optional wird das
+  Profilgewicht automatisch übernommen. Befüllt über einen Garmin-Sync, siehe
   [`supabase/garmin-sync.md`](supabase/garmin-sync.md).
 - **Wochenbericht von Claude** – kurze Einordnung der Woche plus zwei konkrete
   Hinweise, gespeichert pro Kalenderwoche; mit Garmin-Werten, wenn vorhanden.
