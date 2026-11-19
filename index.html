@@ -562,7 +562,7 @@ const IMPORT_EXAMPLE=[
 
 /* ---------- Persistenz ---------- */
 const DEFAULTS = {
-  profile:{name:'',sex:'male',age:30,height:180,weight:80,targetWeight:null},
+  profile:{name:'',sex:'male',age:30,height:180,weight:80,targetWeight:null,targetFat:null,autoWeight:false},
   goal:{kcalTraining:2500,kcalRest:2000,proteinTraining:150,carbsTraining:280,fatTraining:80,proteinRest:150,carbsRest:180,fatRest:75,fiberGoal:30,sugarLimit:50,saltLimit:6,satFatLimit:20,preferences:''},
   days:{},favorites:[],reports:{},ui:{theme:'light',collapsedMeals:{}},meta:{updatedAt:''},
 };
@@ -1512,8 +1512,9 @@ function Today({state,setState,date,setDate,openImport,notify,manualSignal,cloud
 }
 
 /* ---------- Auswertung ---------- */
-const METRICS=[{id:'calories',label:'Kalorien',unit:' kcal'},{id:'protein',label:'Eiweiß',unit:' g'},{id:'carbs',label:'KH',unit:' g'},{id:'fat',label:'Fett',unit:' g'},{id:'fiber',label:'Ballaststoffe',unit:' g'},{id:'sugar',label:'Zucker',unit:' g'},{id:'salt',label:'Salz',unit:' g'}];
-const METRIC_COLOR={calories:'var(--data)',protein:'var(--protein)',carbs:'var(--carbs)',fat:'var(--fat)',fiber:'var(--fiber)',sugar:'var(--sugar)',salt:'var(--salt)'};
+const METRICS=[{id:'calories',label:'Kalorien',unit:' kcal'},{id:'protein',label:'Eiweiß',unit:' g'},{id:'carbs',label:'KH',unit:' g'},{id:'fat',label:'Fett',unit:' g'},{id:'fiber',label:'Ballaststoffe',unit:' g'},{id:'sugar',label:'Zucker',unit:' g'},{id:'salt',label:'Salz',unit:' g'},{id:'weight',label:'Gewicht',unit:' kg',body:true},{id:'bodyfat',label:'Körperfett',unit:' %',body:true}];
+const METRIC_COLOR={calories:'var(--data)',protein:'var(--protein)',carbs:'var(--carbs)',fat:'var(--fat)',fiber:'var(--fiber)',sugar:'var(--sugar)',salt:'var(--salt)',weight:'var(--accent)',bodyfat:'var(--satfat)'};
+const BODY_METRIC = m => m==='weight'||m==='bodyfat';
 const avgArr = arr => arr.length?Math.round((arr.reduce((a,b)=>a+b,0)/arr.length)*10)/10:0;
 const isoWeek = k=>{const[y,m,d]=k.split('-').map(Number);const dt=new Date(Date.UTC(y,m-1,d));const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);const y0=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil(((dt-y0)/86400000+1)/7);};
 const avgF = a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
@@ -1532,7 +1533,7 @@ function buildWeekPayload(state,mon,garminDays){
       garmin:gd[k]&&gd[k].totalKcal!=null?{burnedKcal:Math.round(gd[k].totalKcal),activeKcal:Math.round(gd[k].activeKcal||0),steps:gd[k].steps,restingHr:gd[k].restingHr,sleepH:gd[k].sleep?gd[k].sleep.hours:null,sleepScore:gd[k].sleep?gd[k].sleep.score:null,bodyBatteryAtWake:gd[k].bodyBattery?gd[k].bodyBattery.atWake:null,stressAvg:gd[k].stressAvg}:null,
       weightKg:gd[k]&&gd[k].weight&&gd[k].weight.kg>0?gd[k].weight.kg:null,bodyFatPct:gd[k]&&gd[k].weight?gd[k].weight.bodyFatPct||null:null});}
   return {week:'KW '+isoWeek(mon)+' ab '+deDate(mon),profile:{sex:profile.sex,age:profile.age,height:profile.height,weight:profile.weight,targetWeight:profile.targetWeight},
-    goals:{kcalTraining:goal.kcalTraining,kcalRest:goal.kcalRest,proteinTraining:goal.proteinTraining,proteinRest:goal.proteinRest,fiberGoal:goal.fiberGoal,sugarLimit:goal.sugarLimit,saltLimit:goal.saltLimit},
+    goals:{targetWeightKg:profile.targetWeight||null,targetBodyFatPct:profile.targetFat||null,kcalTraining:goal.kcalTraining,kcalRest:goal.kcalRest,proteinTraining:goal.proteinTraining,proteinRest:goal.proteinRest,fiberGoal:goal.fiberGoal,sugarLimit:goal.sugarLimit,saltLimit:goal.saltLimit},
     preferences:goal.preferences||'',days:list};
 }
 function WeeklyReportCard({state,setState,cloud,notify,garmin}){
@@ -1559,7 +1560,7 @@ function WeeklyReportCard({state,setState,cloud,notify,garmin}){
 function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
   const {profile,goal,days}=state;
   const [range,setRange]=useState(7);
-  const [metric,setMetric]=useState('calories');
+  const [metricRaw,setMetric]=useState('calories');
   const today=todayKey();
   const rows=useMemo(()=>{
     const keys=[]; for(let i=range-1;i>=0;i--)keys.push(addDays(today,-i));
@@ -1567,10 +1568,29 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
       return {key:k,budget,totals:sumNut(d.foods),target:targetMacros(goal,d),meals:mealTotals(d.foods),has:d.foods.length>0};});
   },[days,goal,range,today]);
   const tracked=rows.filter(r=>r.has);
+  const gdAll=garmin&&garmin.days?garmin.days:{};
+  const scale=latestGarminWeight(gdAll); const baseWeight=scale?scale.kg:+profile.weight;
+  const bodyW=k=>{const w=gdAll[k]&&gdAll[k].weight;return w&&w.kg>0?w:null;};
+  const hasBody=rows.some(r=>bodyW(r.key));
+  const metric=(BODY_METRIC(metricRaw)&&!hasBody)?'calories':metricRaw;
+  const isBody=BODY_METRIC(metric);
+  /* Gewichtsverlauf (Waage) */
+  const wRows=rows.map(r=>{const w=gdAll[r.key]&&gdAll[r.key].weight;return {key:r.key,value:w&&w.kg>0?w.kg:null,fat:w&&w.bodyFatPct?w.bodyFatPct:null,muscle:w&&w.muscleKg?w.muscleKg:null};});
+  const wVals=wRows.filter(r=>r.value!=null);
+  const wFirstAvg=avgF(wVals.slice(0,Math.min(7,Math.max(1,Math.floor(wVals.length/2)))).map(r=>r.value)), wLastAvg=avgF(wVals.slice(-Math.min(7,Math.max(1,Math.floor(wVals.length/2)))).map(r=>r.value));
+  const wChange=wVals.length>=2?wLastAvg-wFirstAvg:null;
+  const fatVals=wVals.filter(r=>r.fat!=null), musVals=wVals.filter(r=>r.muscle!=null);
+  const fatChange=fatVals.length>=4?avgF(fatVals.slice(-7).map(r=>r.fat))-avgF(fatVals.slice(0,7).map(r=>r.fat)):null;
+  const musChange=musVals.length>=4?avgF(musVals.slice(-7).map(r=>r.muscle))-avgF(musVals.slice(0,7).map(r=>r.muscle)):null;
+  const wMin=wVals.length?Math.min(...wVals.map(r=>r.value)):null, wMax=wVals.length?Math.max(...wVals.map(r=>r.value)):null;
+  const kg1=v=>v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const signed=(v,d=1,u='')=>(v>0?'+':'')+v.toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+u;
 
   const chartData=rows.map(r=>{
     let value=0,ref=undefined,over=false;
-    if(metric==='calories'){value=r.totals.calories;ref=r.budget;over=value>r.budget;}
+    if(metric==='weight'){const w=bodyW(r.key);value=w?w.kg:null;ref=profile.targetWeight||undefined;over=false;}
+    else if(metric==='bodyfat'){const w=bodyW(r.key);value=w&&w.bodyFatPct?w.bodyFatPct:null;ref=profile.targetFat||undefined;over=false;}
+    else if(metric==='calories'){value=r.totals.calories;ref=r.budget;over=value>r.budget;}
     else if(metric==='protein'){value=r.totals.protein;ref=r.target.protein;}
     else if(metric==='carbs'){value=r.totals.carbs;ref=r.target.carbs;}
     else if(metric==='fat'){value=r.totals.fat;ref=r.target.fat;}
@@ -1580,7 +1600,7 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
     return {key:r.key,value,ref,over};
   });
   const mInfo=METRICS.find(m=>m.id===metric);
-  const tVals=chartData.map((d,i)=>rows[i].has?d.value:null);
+  const tVals=chartData.map((d,i)=>isBody?d.value:(rows[i].has?d.value:null));
   const present=tVals.filter(v=>v!=null);
   const mAvg=avgArr(present);
   const half=Math.floor(present.length/2);
@@ -1595,8 +1615,6 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
   const balance=tracked.reduce((a,r)=>a+(r.totals.calories-r.budget),0);
   const balKg=Math.round(balance/KCAL_PER_KG*100)/100;
   let streak=0; for(let i=0;;i++){const k=addDays(today,-i);if((days[k]&&days[k].foods.length)>0)streak++;else break;}
-  const gdAll=garmin&&garmin.days?garmin.days:{};
-  const scale=latestGarminWeight(gdAll); const baseWeight=scale?scale.kg:+profile.weight;
 
   /* Essenszeiten im Zeitraum */
   const timeDays=tracked.map(r=>({key:r.key,st:eatingStats(days[r.key]),fast:fastingBefore(days,r.key)})).filter(x=>x.st);
@@ -1647,19 +1665,12 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
   const shortDate=k=>{const[y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('de-DE',{day:'numeric',month:'short',year:'numeric'});};
   const weeklyKg=Math.round((avgDev*7/KCAL_PER_KG)*100)/100;
   const proj4=Math.round((baseWeight+weeklyKg*4)*10)/10;
+  /* Ziel-Körperfett → Zielgewicht bei gleichbleibender Magermasse */
+  let fatTarget=null;
+  if(profile.targetFat>0 && scale && scale.bodyFatPct>0){const lean=scale.kg*(1-scale.bodyFatPct/100);const tkg=lean/(1-profile.targetFat/100);const delta=tkg-baseWeight;fatTarget={kg:tkg,etaWeeks:(weeklyKg!==0&&Math.sign(delta)===Math.sign(weeklyKg))?Math.ceil(Math.abs(delta)/Math.abs(weeklyKg)):null};}
   let etaWeeks=null,etaDate=null;
   if(profile.targetWeight!=null && weeklyKg!==0){const delta=profile.targetWeight-baseWeight;if(Math.sign(delta)===Math.sign(weeklyKg)){etaWeeks=Math.ceil(Math.abs(delta)/Math.abs(weeklyKg));etaDate=shortDate(addDays(today,etaWeeks*7));}}
-  /* Gewichtsverlauf (Waage) */
-  const wRows=rows.map(r=>{const w=gdAll[r.key]&&gdAll[r.key].weight;return {key:r.key,value:w&&w.kg>0?w.kg:null,fat:w&&w.bodyFatPct?w.bodyFatPct:null,muscle:w&&w.muscleKg?w.muscleKg:null};});
-  const wVals=wRows.filter(r=>r.value!=null);
-  const wFirstAvg=avgF(wVals.slice(0,Math.min(7,Math.max(1,Math.floor(wVals.length/2)))).map(r=>r.value)), wLastAvg=avgF(wVals.slice(-Math.min(7,Math.max(1,Math.floor(wVals.length/2)))).map(r=>r.value));
-  const wChange=wVals.length>=2?wLastAvg-wFirstAvg:null;
-  const fatVals=wVals.filter(r=>r.fat!=null), musVals=wVals.filter(r=>r.muscle!=null);
-  const fatChange=fatVals.length>=4?avgF(fatVals.slice(-7).map(r=>r.fat))-avgF(fatVals.slice(0,7).map(r=>r.fat)):null;
-  const musChange=musVals.length>=4?avgF(musVals.slice(-7).map(r=>r.muscle))-avgF(musVals.slice(0,7).map(r=>r.muscle)):null;
-  const wMin=wVals.length?Math.min(...wVals.map(r=>r.value)):null, wMax=wVals.length?Math.max(...wVals.map(r=>r.value)):null;
-  const kg1=v=>v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
-  const signed=(v,d=1,u='')=>(v>0?'+':'')+v.toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d})+u;
+
   const enoughForProg=tracked.length>=3;
 
   return (
@@ -1673,17 +1684,21 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
         <Stat label="Im Budget" value={withinBudget+' / '+(tracked.length||0)}/>
         <Stat label="Erfasste Tage" value={tracked.length+' / '+range}/>
         <Stat label={<><Icon name="local_fire_department"/> Serie</>} value={streak} sub={streak===1?'Tag':'Tage'}/>
+        {wVals.length>0 && <Stat label="Gewicht" value={kg1(wVals[wVals.length-1].value)+' kg'} sub={(wChange!=null?signed(wChange,1,' kg'):'')+(profile.targetWeight?' · Ziel '+profile.targetWeight+' kg':'')}/>}
+        {fatVals.length>0 && <Stat label="Körperfett" value={fatVals[fatVals.length-1].fat.toLocaleString('de-DE')+' %'} sub={(fatChange!=null?signed(fatChange,1,' %-Pkt.'):'')+(profile.targetFat?' · Ziel '+profile.targetFat.toLocaleString('de-DE')+' %':'')}/>}
       </div>
 
       {tracked.length===0 && <p className="empty">Noch keine Daten im Zeitraum. Importiere oder erfasse Mahlzeiten.</p>}
 
       <section className="card">
         <div className="section-head"><h3 className="card-title">Zeitverlauf</h3>
-          {tracked.length>0 && <div className="kpi"><span className="kpi-big" style={{color:METRIC_COLOR[metric]}}>{metric==='calories'?Math.round(mAvg):mAvg}</span><span className="kpi-unit">{mInfo.unit.trim()} Ø</span>{present.length>=4 && <span className={'trend '+(trend>0?'up':trend<0?'down':'flat')}>{trend>0?<><Icon name="trending_up"/> steigend</>:trend<0?<><Icon name="trending_down"/> fallend</>:<><Icon name="trending_flat"/> stabil</>}</span>}</div>}
+          {(isBody?present.length>0:tracked.length>0) && <div className="kpi"><span className="kpi-big" style={{color:METRIC_COLOR[metric]}}>{isBody?present[present.length-1].toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1}):metric==='calories'?Math.round(mAvg):mAvg}</span><span className="kpi-unit">{mInfo.unit.trim()}{isBody?' aktuell':' Ø'}</span>{present.length>=4 && <span className={'trend '+((isBody?trend<0:trend>0)?(isBody?'up':'up'):trend===0?'flat':'down')}>{trend>0?<><Icon name="trending_up"/> steigend</>:trend<0?<><Icon name="trending_down"/> fallend</>:<><Icon name="trending_flat"/> stabil</>}</span>}{isBody&&chartData[0]&&chartData.find(d=>d.ref!=null)&&<span className="muted small" style={{alignSelf:'center'}}>Ziel {chartData.find(d=>d.ref!=null).ref.toLocaleString('de-DE')}{mInfo.unit}</span>}</div>}
         </div>
-        <div className="metric-chips">{METRICS.map(m=>(<button key={m.id} className={'metric-chip'+(metric===m.id?' on':'')} onClick={()=>setMetric(m.id)}>{m.label}</button>))}</div>
-        <AreaChart data={chartData.map((d,i)=>({...d,value:rows[i].has?d.value:null}))} unit={mInfo.unit} color={METRIC_COLOR[metric]} decimals={metric==='salt'?1:0}/>
-        <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> Ziel/Budget</span><span><i className="sw danger"/> über Ziel</span>{range>=14&&<span><i className="sw avg"/> 7-Tage-Schnitt</span>}</div>
+        <div className="metric-chips">{METRICS.filter(m=>!m.body||hasBody).map(m=>(<button key={m.id} className={'metric-chip'+(metric===m.id?' on':'')} onClick={()=>setMetric(m.id)}>{m.label}</button>))}</div>
+        {isBody
+          ? <AreaChart data={chartData} unit={mInfo.unit} color={METRIC_COLOR[metric]} baseline="auto" fmt={v=>v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})} decimals={1} refLabel="Ziel"/>
+          : <AreaChart data={chartData.map((d,i)=>({...d,value:rows[i].has?d.value:null}))} unit={mInfo.unit} color={METRIC_COLOR[metric]} decimals={metric==='salt'?1:0}/>}
+        <div className="chart-legend"><span><i className="sw" style={{background:METRIC_COLOR[metric]}}/> Wert</span><span><i className="sw line"/> {isBody?'Ziel':'Ziel/Budget'}</span>{!isBody&&<span><i className="sw danger"/> über Ziel</span>}{range>=14&&<span><i className="sw avg"/> 7-Tage-Schnitt</span>}</div>
       </section>
 
       {cloud&&cloud.user && <section className="card">
@@ -1699,6 +1714,9 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
             {musVals.length>0 && <Stat label="Muskelmasse" value={kg1(musVals[musVals.length-1].muscle)+' kg'} sub={musChange!=null?signed(musChange,1,' kg'):''}/>}
             <Stat label="Messungen" value={wVals.length} sub={'von '+range+' Tagen'}/>
           </div>
+          {(profile.targetWeight||profile.targetFat) && <div className="divider"/>}
+          {profile.targetWeight>0 && <div className="energy-row"><span>Wunschgewicht</span><strong>{profile.targetWeight} kg · noch {signed(profile.targetWeight-wLastAvg,1,' kg')}</strong></div>}
+          {profile.targetFat>0 && fatVals.length>0 && <div className="energy-row"><span>Ziel-Körperfett</span><strong>{profile.targetFat.toLocaleString('de-DE')} % · noch {signed(profile.targetFat-fatVals[fatVals.length-1].fat,1,' %-Pkt.')}</strong></div>}
           <p className="muted small" style={{margin:'10px 0 0'}}>Linie = Tageswerte, gestrichelt = 7-Tage-Schnitt (ab 14 Tagen). Änderung vergleicht den Schnitt der ersten und letzten Tage im Zeitraum. Tagesschwankungen von 1–2 kg sind normal (Wasser, Mageninhalt).</p>
         </>)}
       </section>}
@@ -1713,6 +1731,7 @@ function Stats({state,setState,setDate,goToToday,cloud,notify,garmin}){
             <div className="divider"/>
             <div className="energy-row"><span>Ausgangsgewicht{scale?' (Waage '+dateLabel(scale.date)+')':' (Profil)'}</span><strong>{kg1(baseWeight)} kg</strong></div>
             <div className="energy-row"><span>Gewicht in 4 Wochen ≈</span><strong>{proj4} kg</strong></div>
+            {fatTarget && <div className="energy-row"><span>Ziel-Körperfett {profile.targetFat.toLocaleString('de-DE')} % ≈ bei gleicher Magermasse</span><strong>{kg1(fatTarget.kg)} kg{fatTarget.etaWeeks!=null?' · ~'+fatTarget.etaWeeks+' Wo':''}</strong></div>}
             {etaWeeks!=null
               ? <div className="energy-row total"><span>Ziel {profile.targetWeight} kg voraussichtlich</span><strong>~{etaWeeks} Wo · {etaDate}</strong></div>
               : (profile.targetWeight!=null
@@ -2005,8 +2024,10 @@ function Profile({state,setState,notify,setDate,goToDash,cloud,theme,toggleTheme
         <div className="field-grid two">
           <div className="field"><label>Wunschgewicht</label>
             <div className="num-suffix"><input inputMode="decimal" placeholder="–" value={profile.targetWeight??''} onChange={e=>{const t=e.target.value.replace(',','.').trim();setP({targetWeight:t===''?null:(+t||null)});}}/><span>kg</span></div></div>
+          <div className="field"><label>Ziel-Körperfett</label>
+            <div className="num-suffix"><input inputMode="decimal" placeholder="–" value={profile.targetFat??''} onChange={e=>{const t=e.target.value.replace(',','.').trim();setP({targetFat:t===''?null:(+t||null)});}}/><span>%</span></div></div>
         </div>
-        <p className="muted small" style={{margin:0}}>Wird in der Analyse für die Prognose aus deiner tatsächlichen Kalorienbilanz genutzt.</p>
+        <p className="muted small" style={{margin:0}}>Beides optional. Gewicht und Körperfett kommen von der Garmin-Waage; die Analyse zeigt die Ziele als Linie im Zeitverlauf und rechnet die Prognose dagegen.{scaleW&&scaleW.bodyFatPct?' Aktuell laut Waage: '+scaleW.bodyFatPct.toLocaleString('de-DE')+' % Körperfett.':''}</p>
       </section>
 
       <section className="card">
